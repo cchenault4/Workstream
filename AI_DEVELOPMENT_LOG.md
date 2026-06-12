@@ -97,3 +97,6 @@ Proceed with HTTP adaptor.
 
     Note: Tests passed.
 
+Proceed with Wire and Verify.
+
+

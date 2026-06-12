@@ -52,6 +52,14 @@ gradle run           # start the server (port 8080)
 gradle build         # compile + test + assemble jar
 ```
 
+## Wiring
+
+All manual DI lives in `Application.kt:module()`. The composition order is:
+1. In-memory repositories and `DefaultWebSocketSessionRegistry` are created
+2. `WebSocketEventPublisher` is created with the `Application` as its `CoroutineScope`
+3. Use cases are created with their repositories and publisher
+4. `configurePlugins()` → `configureRouting()` (health) → `configureHttpRoutes(...)` → `configureWebSocketRoutes(...)`
+
 ## Tech Stack
 
 **Kotlin 2.2.0 + Ktor 3.1.3 + Gradle 9.x**, JVM target 24, in-memory storage (no DB). Real-time via Ktor WebSockets (not Socket.IO — no server-side Socket.IO library exists for Ktor).

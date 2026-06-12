@@ -3,6 +3,7 @@ package digital.honeybadger.workflow.adapter.outbound.realtime
 import digital.honeybadger.workflow.adapter.inbound.websocket.WebSocketSessionRegistry
 import digital.honeybadger.workflow.domain.model.*
 import io.mockk.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -15,7 +16,7 @@ class WebSocketEventPublisherTest {
     // relaxed = true avoids MockK bypassing the constructor on a concrete class,
     // which would leave internal fields null and crash on coEvery setup.
     private val registry = mockk<WebSocketSessionRegistry>(relaxed = true)
-    private val publisher = WebSocketEventPublisher(registry, Dispatchers.Unconfined)
+    private val publisher = WebSocketEventPublisher(registry, CoroutineScope(Dispatchers.Unconfined))
 
     private val now = Instant.parse("2024-06-01T12:00:00Z")
 
