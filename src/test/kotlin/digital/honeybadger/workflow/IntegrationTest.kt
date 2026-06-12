@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -50,12 +51,29 @@ class IntegrationTest {
         }.body<Plan>()
         assertEquals("Add JWT authentication", plan.goal)
 
-        // Readiness should be true — one complete phase, no blocking questions
+        // verificationReady — phases done, no blocking questions; review gates still need activities
         val readiness = client.get("/workstreams/${ws.id}/readiness").body<ReadinessState>()
         assertTrue(readiness.allPhasesComplete)
         assertTrue(readiness.verificationReady)
-        assertTrue(readiness.readyForReview)
-        assertTrue(readiness.readyForPR)
+        assertFalse(readiness.readyForReview) // no VERIFICATION activity yet
+        assertFalse(readiness.readyForPR)     // no REVIEW activity yet
+
+        // Posting a VERIFICATION activity unlocks readyForReview
+        client.post("/workstreams/${ws.id}/activity") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateActivityEventRequest("Verification Runner", ActivityType.VERIFICATION, "All tests pass"))
+        }
+        val afterVerification = client.get("/workstreams/${ws.id}/readiness").body<ReadinessState>()
+        assertTrue(afterVerification.readyForReview)
+        assertFalse(afterVerification.readyForPR)
+
+        // Posting a REVIEW activity unlocks readyForPR
+        client.post("/workstreams/${ws.id}/activity") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateActivityEventRequest("Diff Prosecutor", ActivityType.REVIEW, "LGTM, no scope drift"))
+        }
+        val afterReview = client.get("/workstreams/${ws.id}/readiness").body<ReadinessState>()
+        assertTrue(afterReview.readyForPR)
 
         // Update status
         val updated = client.patch("/workstreams/${ws.id}") {
@@ -74,11 +92,11 @@ class IntegrationTest {
             setBody(CreateActivityEventRequest("Implementation Agent", ActivityType.IMPLEMENTATION, "Completed phase 1"))
         }
 
-        // Verify activity list order
+        // Verify activity list — 4 events total: verification, review, context scout, implementation
         val events = client.get("/workstreams/${ws.id}/activity").body<List<ActivityEvent>>()
-        assertEquals(2, events.size)
-        assertEquals("Context Scout", events[0].agentName)
-        assertEquals("Implementation Agent", events[1].agentName)
+        assertEquals(4, events.size)
+        assertEquals("Context Scout", events[2].agentName)
+        assertEquals("Implementation Agent", events[3].agentName)
 
         // Workstream appears in list
         val all = client.get("/workstreams").body<List<Workstream>>()

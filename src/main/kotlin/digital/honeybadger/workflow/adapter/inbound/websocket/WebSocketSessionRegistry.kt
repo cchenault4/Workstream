@@ -38,8 +38,12 @@ class DefaultWebSocketSessionRegistry : WebSocketSessionRegistry {
     }
 
     override suspend fun broadcast(workstreamId: String, message: String) {
-        rooms[workstreamId]?.forEach { session ->
-            runCatching { session.send(Frame.Text(message)) }
+        val sessions = rooms[workstreamId] ?: return
+        val dead = mutableSetOf<DefaultWebSocketSession>()
+        sessions.forEach { session ->
+            if (runCatching { session.send(Frame.Text(message)) }.isFailure) dead.add(session)
         }
+        // Evict dead sessions so subsequent broadcasts skip them without retrying.
+        sessions.removeAll(dead)
     }
 }

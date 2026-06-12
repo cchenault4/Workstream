@@ -30,7 +30,7 @@ fun Application.module() {
 
     // Use cases
     val workstreamService = WorkstreamService(workstreamRepo, publisher)
-    val planService = PlanService(workstreamRepo, planRepo, publisher)
+    val planService = PlanService(workstreamRepo, planRepo, publisher, activityRepo)
     val activityService = ActivityService(workstreamRepo, activityRepo, publisher)
 
     // Plugins, routes, WebSocket

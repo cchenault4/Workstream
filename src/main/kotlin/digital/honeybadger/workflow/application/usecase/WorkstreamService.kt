@@ -19,6 +19,9 @@ class WorkstreamService(
 ) : WorkstreamUseCase {
 
     override fun create(request: CreateWorkstreamRequest): Workstream {
+        require(request.title.isNotBlank()) { "title must not be blank" }
+        require(request.description.isNotBlank()) { "description must not be blank" }
+        require(request.requester.isNotBlank()) { "requester must not be blank" }
         // Capture now() once so createdAt and updatedAt are guaranteed equal on creation.
         val now = clock.now()
         return repository.save(

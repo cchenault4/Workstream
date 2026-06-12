@@ -5,6 +5,7 @@ import digital.honeybadger.workflow.application.port.outbound.EventPublisher
 import digital.honeybadger.workflow.domain.model.ActivityEvent
 import digital.honeybadger.workflow.domain.model.Plan
 import digital.honeybadger.workflow.domain.model.Workstream
+import digital.honeybadger.workflow.appJson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
@@ -26,7 +27,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 class WebSocketEventPublisher(
     private val registry: WebSocketSessionRegistry,
     private val scope: CoroutineScope,
-    private val json: Json = Json
+    private val json: Json = appJson
 ) : EventPublisher {
 
     override fun publish(event: ActivityEvent) =

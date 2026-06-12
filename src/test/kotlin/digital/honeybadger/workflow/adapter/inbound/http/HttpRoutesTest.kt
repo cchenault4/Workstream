@@ -35,7 +35,7 @@ class HttpRoutesTest {
         val activityRepo = InMemoryActivityRepository()
         val publisher = NoOpEventPublisher()
         val workstreamService = WorkstreamService(workstreamRepo, publisher)
-        val planService = PlanService(workstreamRepo, planRepo, publisher)
+        val planService = PlanService(workstreamRepo, planRepo, publisher, activityRepo)
         val activityService = ActivityService(workstreamRepo, activityRepo, publisher)
         application {
             configurePlugins()
@@ -271,5 +271,49 @@ class HttpRoutesTest {
         assertEquals(2, events.size)
         assertEquals("first", events[0].message)
         assertEquals("second", events[1].message)
+    }
+
+    // ── Validation (400s) ────────────────────────────────────────────────────
+
+    @Test
+    fun `POST workstreams returns 400 when title is blank`() = testApplication {
+        setup()
+        val response = jsonClient().post("/workstreams") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateWorkstreamRequest("", "Desc", "alice", Priority.HIGH))
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
+    @Test
+    fun `PUT plan returns 400 when goal is blank`() = testApplication {
+        setup()
+        val client = jsonClient()
+        val ws = client.post("/workstreams") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateWorkstreamRequest("Title", "Desc", "alice", Priority.MEDIUM))
+        }.body<Workstream>()
+
+        val response = client.put("/workstreams/${ws.id}/plan") {
+            contentType(ContentType.Application.Json)
+            setBody(UpsertPlanRequest(goal = ""))
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
+    @Test
+    fun `POST activity returns 400 when agentName is blank`() = testApplication {
+        setup()
+        val client = jsonClient()
+        val ws = client.post("/workstreams") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateWorkstreamRequest("Title", "Desc", "alice", Priority.MEDIUM))
+        }.body<Workstream>()
+
+        val response = client.post("/workstreams/${ws.id}/activity") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateActivityEventRequest("", ActivityType.PLANNING, "msg"))
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
     }
 }

@@ -1,6 +1,7 @@
 package digital.honeybadger.workflow.domain.service
 
 import digital.honeybadger.workflow.domain.model.*
+import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -100,10 +101,33 @@ class ReadinessServiceTest {
     }
 
     @Test
-    fun `readyForReview and readyForPR follow verificationReady`() {
+    fun `readyForReview is false when verificationReady but no VERIFICATION activity exists`() {
         val readyPlan = plan(phases = listOf(phase(PhaseStatus.COMPLETE)))
-        val state = ReadinessService.compute(readyPlan)
+        val state = ReadinessService.compute(readyPlan, emptyList())
         assertTrue(state.verificationReady)
+        assertFalse(state.readyForReview)
+        assertFalse(state.readyForPR)
+    }
+
+    @Test
+    fun `readyForReview is true when verificationReady and a VERIFICATION activity exists`() {
+        val now = Instant.parse("2024-06-01T12:00:00Z")
+        val readyPlan = plan(phases = listOf(phase(PhaseStatus.COMPLETE)))
+        val activities = listOf(ActivityEvent("e1", "ws1", "Runner", ActivityType.VERIFICATION, "All pass", now))
+        val state = ReadinessService.compute(readyPlan, activities)
+        assertTrue(state.readyForReview)
+        assertFalse(state.readyForPR)
+    }
+
+    @Test
+    fun `readyForPR is true when readyForReview and a REVIEW activity exists`() {
+        val now = Instant.parse("2024-06-01T12:00:00Z")
+        val readyPlan = plan(phases = listOf(phase(PhaseStatus.COMPLETE)))
+        val activities = listOf(
+            ActivityEvent("e1", "ws1", "Runner", ActivityType.VERIFICATION, "All pass", now),
+            ActivityEvent("e2", "ws1", "Reviewer", ActivityType.REVIEW, "LGTM", now)
+        )
+        val state = ReadinessService.compute(readyPlan, activities)
         assertTrue(state.readyForReview)
         assertTrue(state.readyForPR)
     }

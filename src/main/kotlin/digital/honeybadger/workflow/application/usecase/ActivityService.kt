@@ -21,6 +21,8 @@ class ActivityService(
 
     override fun add(workstreamId: String, request: CreateActivityEventRequest): ActivityEvent {
         workstreamRepository.findById(workstreamId) ?: throw WorkstreamNotFoundException(workstreamId)
+        require(request.agentName.isNotBlank()) { "agentName must not be blank" }
+        require(request.message.isNotBlank()) { "message must not be blank" }
         val saved = activityRepository.save(
             ActivityEvent(
                 id = UUID.randomUUID().toString(),

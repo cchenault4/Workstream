@@ -1,10 +1,10 @@
 package digital.honeybadger.workflow.adapter.inbound.websocket
 
+import digital.honeybadger.workflow.appJson
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
-import kotlinx.serialization.json.Json
 
 /**
  * Registers the WebSocket endpoint at /ws.
@@ -14,11 +14,10 @@ import kotlinx.serialization.json.Json
  *   {"type":"workstream:leave","workstreamId":"<id>"} — unsubscribe from a room
  *
  * Unknown message types are silently ignored.
+ * Messages with a blank workstreamId are silently ignored.
  * All joined rooms are cleaned up automatically when the session closes.
  */
 fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry) {
-    val json = Json { ignoreUnknownKeys = true }
-
     routing {
         webSocket("/ws") {
             val joinedRooms = mutableSetOf<String>()
@@ -26,8 +25,10 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry) {
                 for (frame in incoming) {
                     if (frame !is Frame.Text) continue
                     val msg = runCatching {
-                        json.decodeFromString<WsClientMessage>(frame.readText())
+                        appJson.decodeFromString<WsClientMessage>(frame.readText())
                     }.getOrNull() ?: continue
+
+                    if (msg.workstreamId.isBlank()) continue
 
                     when (msg.type) {
                         "workstream:join" -> {

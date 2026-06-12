@@ -67,4 +67,20 @@ class WebSocketSessionRegistryTest {
 
         coVerify(exactly = 1) { session.send(any()) }
     }
+
+    @Test
+    fun `dead session is evicted after a failed send and skipped on subsequent broadcasts`() = runTest {
+        val dead = mockk<DefaultWebSocketSession>()
+        val alive = mockSession()
+        coEvery { dead.send(any<Frame>()) } throws Exception("connection closed")
+
+        registry.join("ws-1", dead)
+        registry.join("ws-1", alive)
+
+        registry.broadcast("ws-1", "first")  // dead session fails and is evicted
+        registry.broadcast("ws-1", "second") // only alive session receives this one
+
+        coVerify(exactly = 2) { alive.send(any<Frame>()) }
+        coVerify(exactly = 1) { dead.send(any<Frame>()) } // attempted only once, then evicted
+    }
 }

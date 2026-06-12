@@ -31,6 +31,9 @@ fun Application.configureHttpRoutes(
         exception<PlanNotFoundException> { call, cause ->
             call.respond(HttpStatusCode.NotFound, ErrorResponse(cause.message ?: "Not found"))
         }
+        exception<IllegalArgumentException> { call, cause ->
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse(cause.message ?: "Bad request"))
+        }
         exception<Throwable> { call, cause ->
             call.respond(HttpStatusCode.InternalServerError, ErrorResponse(cause.message ?: "Internal server error"))
         }
