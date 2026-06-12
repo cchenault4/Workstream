@@ -87,6 +87,18 @@ During wiring, Claude Code proactively refactored `WebSocketEventPublisher` from
 taking a `CoroutineScope` so that broadcast coroutines are tied to the application lifecycle and
 cancelled cleanly on shutdown. The change was noticed and fixed before I had to ask.
 
+### Code review and fixes
+
+> *"Please do a final review of the code."*
+> *"Please fix all findings."*
+
+Claude Code ran a multi-angle review and surfaced five findings. I asked for all of them to be
+fixed. The most significant finding was that `readyForReview` and `readyForPR` were always
+identical to `verificationReady` — they were hollow fields with no independent meaning. The fix
+extended `ReadinessService` to accept activity events and defined proper gate semantics:
+`readyForReview` requires a `VERIFICATION` activity to have been posted; `readyForPR` requires a
+`REVIEW` activity. This changed the domain model and the integration test in a meaningful way.
+
 ---
 
 ## Human Overrides
@@ -140,19 +152,19 @@ All code was written test-first. The test suite covers:
 
 | Layer | Type | Count |
 |-------|------|-------|
-| `ReadinessService` | Unit | 12 |
+| `ReadinessService` | Unit | 14 |
 | `WorkstreamService` | Unit (MockK) | 7 |
-| `PlanService` | Unit (MockK) | 8 |
+| `PlanService` | Unit (MockK) | 11 |
 | `ActivityService` | Unit (MockK) | 5 |
 | In-memory repositories | Unit | 11 |
-| `WebSocketSessionRegistry` | Unit (MockK) | 5 |
+| `WebSocketSessionRegistry` | Unit (MockK) | 6 |
 | `WebSocketEventPublisher` | Unit (MockK) | 3 |
 | WebSocket route | Integration (testApplication) | 3 |
-| HTTP routes | Integration (testApplication) | 16 |
+| HTTP routes | Integration (testApplication) | 19 |
 | End-to-end lifecycle | Integration (testApplication) | 2 |
-| **Total** | | **75** |
+| **Total** | | **81** |
 
-All 75 tests pass on every commit via `gradle test`.
+All 81 tests pass on every commit via `gradle test`.
 
 ### Manual smoke test
 
@@ -176,9 +188,6 @@ curl -X POST http://localhost:8080/workstreams \
   integration test uses a `delay(50)` to allow the server handler coroutine to process the join
   frame before the HTTP post triggers a broadcast. This is a pragmatic workaround; a production
   system would use explicit acknowledgement or a subscription confirmation message.
-- **No input validation**: field-level validation (blank title, empty goal, etc.) is not enforced.
-  The use case contracts document what callers are expected to supply, but nothing rejects a
-  malformed request beyond JSON parse errors.
 - **In-memory storage**: all state is lost on restart. Replacing the three `InMemory*` repository
   implementations with database-backed ones requires no changes outside `adapter/outbound/persistence/`
   and `Application.kt`.
