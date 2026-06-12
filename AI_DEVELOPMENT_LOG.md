@@ -93,4 +93,7 @@ Please rename WsMessages.kt to WsClientMessage
 
     Note: Tests passed.
 
+Proceed with HTTP adaptor.
+
+    Note: Tests passed.
 
