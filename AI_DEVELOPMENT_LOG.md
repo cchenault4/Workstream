@@ -36,3 +36,12 @@ Proceed with Phase 1 to create build, test harness, Ktor engine and the rest of 
 Proceed with Phase 2 to create the domain model.
 
     Note: Tests passed.
+
+I would like to change the plan. Please add the input ports and DTOs (if any). Add comments that describe the purpose, 
+assumptions, requirements and invariants for each function.
+
+    Note: The DTOs were going to be put into the wrong directory.
+
+The DTOs should be visible to the inbound ports. They should be part of the application, not the adapters.  
+
+    Note: Tests passed.
