@@ -3,6 +3,7 @@ package digital.honeybadger.workflow.application.usecase
 import digital.honeybadger.workflow.application.dto.UpsertPlanRequest
 import digital.honeybadger.workflow.application.exception.PlanNotFoundException
 import digital.honeybadger.workflow.application.exception.WorkstreamNotFoundException
+import digital.honeybadger.workflow.application.port.outbound.EventPublisher
 import digital.honeybadger.workflow.application.port.outbound.PlanRepository
 import digital.honeybadger.workflow.application.port.outbound.WorkstreamRepository
 import digital.honeybadger.workflow.domain.model.*
@@ -14,7 +15,8 @@ class PlanServiceTest {
 
     private val workstreamRepository = mockk<WorkstreamRepository>()
     private val planRepository = mockk<PlanRepository>()
-    private val service = PlanService(workstreamRepository, planRepository)
+    private val publisher = mockk<EventPublisher>(relaxed = true)
+    private val service = PlanService(workstreamRepository, planRepository, publisher)
 
     private val now = Instant.parse("2024-06-01T12:00:00Z")
 
@@ -48,6 +50,16 @@ class PlanServiceTest {
         assertEquals("ws-1", result.workstreamId)
         assertEquals("Build the thing", result.goal)
         verify(exactly = 1) { planRepository.save(any()) }
+    }
+
+    @Test
+    fun `upsert broadcasts plan update after saving`() {
+        every { workstreamRepository.findById("ws-1") } returns sampleWorkstream
+        every { planRepository.save(any()) } answers { firstArg() }
+
+        service.upsert("ws-1", sampleRequest)
+
+        verify(exactly = 1) { publisher.publishPlanUpdate(any()) }
     }
 
     @Test

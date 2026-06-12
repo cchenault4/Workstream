@@ -4,6 +4,7 @@ import digital.honeybadger.workflow.application.dto.UpsertPlanRequest
 import digital.honeybadger.workflow.application.exception.PlanNotFoundException
 import digital.honeybadger.workflow.application.exception.WorkstreamNotFoundException
 import digital.honeybadger.workflow.application.port.inbound.PlanUseCase
+import digital.honeybadger.workflow.application.port.outbound.EventPublisher
 import digital.honeybadger.workflow.application.port.outbound.PlanRepository
 import digital.honeybadger.workflow.application.port.outbound.WorkstreamRepository
 import digital.honeybadger.workflow.domain.model.Plan
@@ -13,12 +14,13 @@ import digital.honeybadger.workflow.domain.service.ReadinessService
 /** Concrete implementation of [PlanUseCase]. Verifies workstream existence before every operation. */
 class PlanService(
     private val workstreamRepository: WorkstreamRepository,
-    private val planRepository: PlanRepository
+    private val planRepository: PlanRepository,
+    private val publisher: EventPublisher
 ) : PlanUseCase {
 
     override fun upsert(workstreamId: String, request: UpsertPlanRequest): Plan {
         workstreamRepository.findById(workstreamId) ?: throw WorkstreamNotFoundException(workstreamId)
-        return planRepository.save(
+        val saved = planRepository.save(
             Plan(
                 workstreamId = workstreamId,
                 goal = request.goal,
@@ -29,6 +31,8 @@ class PlanService(
                 verificationPlan = request.verificationPlan
             )
         )
+        publisher.publishPlanUpdate(saved)
+        return saved
     }
 
     override fun get(workstreamId: String): Plan {

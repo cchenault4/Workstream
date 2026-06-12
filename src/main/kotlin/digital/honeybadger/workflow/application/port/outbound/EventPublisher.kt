@@ -1,6 +1,8 @@
 package digital.honeybadger.workflow.application.port.outbound
 
 import digital.honeybadger.workflow.domain.model.ActivityEvent
+import digital.honeybadger.workflow.domain.model.Plan
+import digital.honeybadger.workflow.domain.model.Workstream
 
 /**
  * Outbound port for real-time event broadcasting.
@@ -16,4 +18,10 @@ interface EventPublisher {
 
     /** Broadcasts [event] to all real-time subscribers of its workstream. */
     fun publish(event: ActivityEvent)
+
+    /** Broadcasts a workstream mutation to all real-time subscribers of that workstream. */
+    fun publishWorkstreamUpdate(workstream: Workstream)
+
+    /** Broadcasts a plan mutation to all real-time subscribers of the plan's workstream. */
+    fun publishPlanUpdate(plan: Plan)
 }

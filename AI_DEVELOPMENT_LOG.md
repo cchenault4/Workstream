@@ -76,4 +76,21 @@ Proceed
 
     Note: Tests passed.
 
-I need to review the code before proceeding to the adapters
+Please implement the outbound adaptors.
+
+    Note: Tests passed.
+
+Proceed with WebSocket Adapter
+
+    Note: This took a lot of retries by the agent. I should look into how to make this faster.
+
+I think that WsServerMessage should be associated with the outbound adaptor, not inbound.     
+
+⏺ Agreed. WsClientMessage is inbound (client→server), WsServerMessage is outbound (server→client). They shouldn't share 
+a file. I'll split them and move WsServerMessage to adapter/outbound/realtime/.
+
+Please rename WsMessages.kt to WsClientMessage  
+
+    Note: Tests passed.
+
+

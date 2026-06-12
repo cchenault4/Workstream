@@ -3,6 +3,7 @@ package digital.honeybadger.workflow.application.usecase
 import digital.honeybadger.workflow.application.dto.CreateWorkstreamRequest
 import digital.honeybadger.workflow.application.dto.UpdateWorkstreamRequest
 import digital.honeybadger.workflow.application.exception.WorkstreamNotFoundException
+import digital.honeybadger.workflow.application.port.outbound.EventPublisher
 import digital.honeybadger.workflow.application.port.outbound.WorkstreamRepository
 import digital.honeybadger.workflow.domain.model.*
 import io.mockk.*
@@ -13,8 +14,9 @@ import kotlin.test.*
 class WorkstreamServiceTest {
 
     private val repository = mockk<WorkstreamRepository>()
+    private val publisher = mockk<EventPublisher>(relaxed = true)
     private val clock = mockk<Clock>()
-    private val service = WorkstreamService(repository, clock)
+    private val service = WorkstreamService(repository, publisher, clock)
 
     private val now = Instant.parse("2024-06-01T12:00:00Z")
     private val later = Instant.parse("2024-06-01T13:00:00Z")
@@ -61,6 +63,17 @@ class WorkstreamServiceTest {
     fun `getById throws WorkstreamNotFoundException when not found`() {
         every { repository.findById("missing") } returns null
         assertFailsWith<WorkstreamNotFoundException> { service.getById("missing") }
+    }
+
+    @Test
+    fun `update broadcasts workstream after saving`() {
+        every { clock.now() } returns later
+        every { repository.findById("ws-1") } returns sample
+        every { repository.save(any()) } answers { firstArg() }
+
+        service.update("ws-1", UpdateWorkstreamRequest(status = WorkstreamStatus.PLANNING))
+
+        verify(exactly = 1) { publisher.publishWorkstreamUpdate(any()) }
     }
 
     @Test
