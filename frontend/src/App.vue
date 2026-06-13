@@ -1,64 +1,46 @@
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-
-type Status = 'checking' | 'ok' | 'unreachable'
-
-const status = ref<Status>('checking')
-
-async function checkHealth(): Promise<void> {
-  status.value = 'checking'
-  try {
-    const res = await fetch('/api/health')
-    status.value = res.ok ? 'ok' : 'unreachable'
-  } catch {
-    status.value = 'unreachable'
-  }
-}
-
-onMounted(checkHealth)
-</script>
-
 <template>
-  <main>
-    <h1>Workstream</h1>
-    <div class="status" :class="status">
-      <span v-if="status === 'checking'">Checking backend…</span>
-      <span v-else-if="status === 'ok'">Backend: OK</span>
-      <span v-else>Backend: Unreachable</span>
-    </div>
-    <button @click="checkHealth">Refresh</button>
-  </main>
+  <header>
+    <span class="app-name">Workstream</span>
+    <nav>
+      <RouterLink to="/workstreams">Workstreams</RouterLink>
+      <RouterLink to="/health">Health</RouterLink>
+    </nav>
+  </header>
+  <RouterView />
 </template>
 
 <style scoped>
-main {
+header {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
-  padding: 4rem 2rem;
-  font-family: sans-serif;
-}
-
-.status {
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.status.checking     { background: #e5e7eb; color: #374151; }
-.status.ok           { background: #d1fae5; color: #065f46; }
-.status.unreachable  { background: #fee2e2; color: #991b1b; }
-
-button {
-  padding: 0.5rem 1.25rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  gap: 2rem;
+  padding: 0 2rem;
+  height: 52px;
+  border-bottom: 1px solid #e5e7eb;
   background: white;
-  cursor: pointer;
-  font-size: 0.9rem;
 }
 
-button:hover { background: #f3f4f6; }
+.app-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #111827;
+}
+
+nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+nav a {
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+nav a:hover { background: #f3f4f6; color: #111827; }
+nav a.router-link-active { background: #ede9fe; color: #4f46e5; }
 </style>
