@@ -140,7 +140,7 @@ onMounted(load)
         </tr>
       </thead>
       <tbody>
-        <tr v-for="ws in workstreams" :key="ws.id">
+        <tr v-for="ws in workstreams" :key="ws.id" class="clickable" @click="$router.push(`/workstreams/${ws.id}`)">
           <td class="cell-title">{{ ws.title }}</td>
           <td>{{ ws.requester }}</td>
           <td><span class="badge" :class="PRIORITY_CLASS[ws.priority]">{{ ws.priority }}</span></td>
@@ -275,7 +275,8 @@ td {
 }
 
 tr:last-child td { border-bottom: none; }
-tr:hover td { background: #f9fafb; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: #f9fafb; }
 
 .cell-title { font-weight: 500; }
 .cell-date  { color: #9ca3af; white-space: nowrap; }

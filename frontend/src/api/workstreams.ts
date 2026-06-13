@@ -1,4 +1,13 @@
-import type { CreateWorkstreamRequest, Workstream } from '../types/workstream'
+import type {
+  ActivityEvent,
+  CreateActivityEventRequest,
+  CreateWorkstreamRequest,
+  Plan,
+  ReadinessState,
+  UpdateWorkstreamRequest,
+  UpsertPlanRequest,
+  Workstream,
+} from '../types/workstream'
 
 const BASE = '/api'
 
@@ -15,7 +24,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const workstreamsApi = {
-  list: () => request<Workstream[]>('/workstreams'),
+  list: () =>
+    request<Workstream[]>('/workstreams'),
+
   create: (payload: CreateWorkstreamRequest) =>
     request<Workstream>('/workstreams', { method: 'POST', body: JSON.stringify(payload) }),
+
+  get: (id: string) =>
+    request<Workstream>(`/workstreams/${id}`),
+
+  update: (id: string, payload: UpdateWorkstreamRequest) =>
+    request<Workstream>(`/workstreams/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+
+  getPlan: (id: string) =>
+    request<Plan>(`/workstreams/${id}/plan`),
+
+  upsertPlan: (id: string, payload: UpsertPlanRequest) =>
+    request<Plan>(`/workstreams/${id}/plan`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  getReadiness: (id: string) =>
+    request<ReadinessState>(`/workstreams/${id}/readiness`),
+
+  getActivity: (id: string) =>
+    request<ActivityEvent[]>(`/workstreams/${id}/activity`),
+
+  addActivity: (id: string, payload: CreateActivityEventRequest) =>
+    request<ActivityEvent>(`/workstreams/${id}/activity`, { method: 'POST', body: JSON.stringify(payload) }),
 }
