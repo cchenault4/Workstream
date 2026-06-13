@@ -9,6 +9,7 @@ import type {
   CreateActivityEventRequest,
   PhaseStatus,
   Plan,
+  QuestionType,
   ReadinessState,
   UpsertPlanRequest,
   Workstream,
@@ -62,6 +63,19 @@ function openPlanForm() {
   planForm.value = makePlanForm(plan.value ?? undefined)
   planFormError.value = null
   showPlanForm.value = true
+}
+
+function addQuestion() {
+  planForm.value.openQuestions.push({
+    id: Math.random().toString(36).slice(2, 10),
+    question: '',
+    type: 'BLOCKING',
+    resolution: undefined,
+  })
+}
+
+function removeQuestion(index: number) {
+  planForm.value.openQuestions.splice(index, 1)
 }
 
 function addPhase() {
@@ -168,7 +182,8 @@ const { connected } = useWorkstreamSocket(id, {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const STATUSES: WorkstreamStatus[] = ['NEW', 'PLANNING', 'EXECUTING', 'REVIEWING', 'VERIFIED', 'BLOCKED']
 const ACTIVITY_TYPES: ActivityType[] = ['CONTEXT_DISCOVERY', 'PLANNING', 'IMPLEMENTATION', 'REVIEW', 'VERIFICATION', 'HANDOFF']
-const PHASE_STATUSES: PhaseStatus[] = ['PENDING', 'IN_PROGRESS', 'COMPLETE', 'BLOCKED']
+const PHASE_STATUSES: PhaseStatus[]    = ['PENDING', 'IN_PROGRESS', 'COMPLETE', 'BLOCKED']
+const QUESTION_TYPES: QuestionType[]   = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
 
 const PRIORITY_CLASS: Record<string, string> = {
   LOW: 'badge-low', MEDIUM: 'badge-medium', HIGH: 'badge-high',
@@ -176,6 +191,9 @@ const PRIORITY_CLASS: Record<string, string> = {
 const STATUS_CLASS: Record<string, string> = {
   NEW: 'badge-new', PLANNING: 'badge-planning', EXECUTING: 'badge-executing',
   REVIEWING: 'badge-reviewing', VERIFIED: 'badge-verified', BLOCKED: 'badge-blocked',
+}
+const QUESTION_TYPE_CLASS: Record<QuestionType, string> = {
+  BLOCKING: 'badge-blocked', ASSUMABLE: 'badge-planning', DEFERRABLE: 'badge-low',
 }
 const PHASE_CLASS: Record<PhaseStatus, string> = {
   PENDING: 'badge-low', IN_PROGRESS: 'badge-executing', COMPLETE: 'badge-verified', BLOCKED: 'badge-blocked',
@@ -245,6 +263,34 @@ function formatDateTime(iso: string): string {
           </div>
 
           <div class="field">
+            <label>Open Questions</label>
+            <div v-if="planForm.openQuestions.length === 0" class="muted small">No open questions yet.</div>
+            <div v-for="(q, i) in planForm.openQuestions" :key="q.id" class="phase-card">
+              <div class="phase-card-header">
+                <span class="phase-num">Question {{ i + 1 }}</span>
+                <button type="button" class="btn-remove" @click="removeQuestion(i)">✕ Remove</button>
+              </div>
+              <div class="field">
+                <label>Question</label>
+                <input v-model="q.question" required placeholder="e.g. What should the token expiry be?" />
+              </div>
+              <div class="field-row">
+                <div class="field field-status">
+                  <label>Type</label>
+                  <select v-model="q.type">
+                    <option v-for="t in QUESTION_TYPES" :key="t" :value="t">{{ t }}</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Resolution (optional)</label>
+                  <input v-model="q.resolution" placeholder="e.g. 24 hours per security policy" />
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn-add-phase" @click="addQuestion">+ Add Question</button>
+          </div>
+
+          <div class="field">
             <label>Phases</label>
             <div v-if="planForm.phases.length === 0" class="muted small">No phases yet.</div>
             <div v-for="(phase, i) in planForm.phases" :key="phase.id" class="phase-card">
@@ -285,6 +331,17 @@ function formatDateTime(iso: string): string {
         <!-- Plan display -->
         <div v-else-if="plan" class="card">
           <p class="plan-goal">{{ plan.goal }}</p>
+
+          <div v-if="plan.openQuestions.length > 0" class="questions-list">
+            <div v-for="q in plan.openQuestions" :key="q.id" class="question-item">
+              <span class="badge" :class="QUESTION_TYPE_CLASS[q.type]">{{ q.type }}</span>
+              <div class="question-body">
+                <span class="question-text">{{ q.question }}</span>
+                <span v-if="q.resolution" class="question-resolution">→ {{ q.resolution }}</span>
+                <span v-else-if="q.type === 'BLOCKING'" class="question-unresolved">⚠ Unresolved</span>
+              </div>
+            </div>
+          </div>
 
           <div v-if="plan.phases.length > 0" class="phases-list">
             <div v-for="phase in plan.phases" :key="phase.id" class="phase-item">
@@ -476,6 +533,30 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
 }
 
 .form-card { background: #f9fafb; }
+
+/* Open questions display */
+.questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.question-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.875rem;
+}
+
+.question-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.question-text       { color: #111827; }
+.question-resolution { color: #059669; font-size: 0.8rem; }
+.question-unresolved { color: #b45309; font-size: 0.8rem; }
 
 /* Plan */
 .plan-goal {
