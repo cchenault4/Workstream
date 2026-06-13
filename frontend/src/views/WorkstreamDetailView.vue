@@ -81,13 +81,15 @@ async function savePlan() {
   planFormError.value = null
   try {
     plan.value = await workstreamsApi.upsertPlan(id, planForm.value)
-    readiness.value = await workstreamsApi.getReadiness(id)
-    showPlanForm.value = false
   } catch (e) {
     planFormError.value = e instanceof Error ? e.message : 'Failed to save plan'
-  } finally {
     planSaving.value = false
+    return
   }
+  // Plan saved — close form before awaiting readiness so the UI unblocks immediately.
+  planSaving.value = false
+  showPlanForm.value = false
+  readiness.value = await workstreamsApi.getReadiness(id).catch(() => null)
 }
 
 // ── Activity form ─────────────────────────────────────────────────────────────
@@ -106,15 +108,16 @@ async function addActivity() {
   try {
     const event = await workstreamsApi.addActivity(id, activityForm.value)
     activities.value.unshift(event)
-    // Refresh readiness — a new VERIFICATION or REVIEW event may change gates
-    if (plan.value) readiness.value = await workstreamsApi.getReadiness(id)
-    activityForm.value = { agentName: '', type: 'PLANNING', message: '' }
-    showActivityForm.value = false
   } catch (e) {
     activityFormError.value = e instanceof Error ? e.message : 'Failed to add event'
-  } finally {
     activitySaving.value = false
+    return
   }
+  // Event saved — reset form and close before refreshing readiness.
+  activitySaving.value = false
+  activityForm.value = { agentName: '', type: 'PLANNING', message: '' }
+  showActivityForm.value = false
+  if (plan.value) readiness.value = await workstreamsApi.getReadiness(id).catch(() => null)
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
