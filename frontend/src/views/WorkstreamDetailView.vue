@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { workstreamsApi } from '../api/workstreams'
+import { useWorkstreamSocket } from '../composables/useWorkstreamSocket'
 import type {
   ActivityEvent,
   ActivityType,
@@ -141,6 +142,27 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+// ── Real-time ─────────────────────────────────────────────────────────────────
+const { connected } = useWorkstreamSocket(id, {
+  onActivity: (event) => {
+    // Dedup: the user's own POST already adds the event immediately.
+    if (!activities.value.some(a => a.id === event.id)) {
+      activities.value.unshift(event)
+    }
+    // A VERIFICATION or REVIEW event may unlock readiness gates.
+    if (plan.value && (event.type === 'VERIFICATION' || event.type === 'REVIEW')) {
+      workstreamsApi.getReadiness(id).then(r => { readiness.value = r }).catch(() => {})
+    }
+  },
+  onWorkstreamUpdated: (ws) => {
+    workstream.value = ws
+  },
+  onPlanUpdated: (updatedPlan) => {
+    plan.value = updatedPlan
+    workstreamsApi.getReadiness(id).then(r => { readiness.value = r }).catch(() => {})
+  },
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -315,7 +337,12 @@ function formatDateTime(iso: string): string {
       <!-- ── Activity ──────────────────────────────────────────────────────── -->
       <section>
         <div class="section-header">
-          <h2>Activity</h2>
+          <div class="section-title-row">
+            <h2>Activity</h2>
+            <span class="live-indicator" :class="connected ? 'live' : 'offline'">
+              {{ connected ? '● Live' : '○ Offline' }}
+            </span>
+          </div>
           <button class="btn-secondary" @click="showActivityForm = !showActivityForm">
             {{ showActivityForm ? 'Cancel' : '+ Add Event' }}
           </button>
@@ -424,6 +451,20 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
   justify-content: space-between;
   margin-bottom: 0.75rem;
 }
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.live-indicator {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.live-indicator.live    { color: #059669; }
+.live-indicator.offline { color: #9ca3af; }
 
 .card {
   border: 1px solid #e5e7eb;
