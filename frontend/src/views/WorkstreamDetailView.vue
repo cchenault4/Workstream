@@ -222,13 +222,27 @@ function formatDateTime(iso: string): string {
           <div class="field">
             <label>Phases</label>
             <div v-if="planForm.phases.length === 0" class="muted small">No phases yet.</div>
-            <div v-for="(phase, i) in planForm.phases" :key="phase.id" class="phase-row">
-              <input v-model="phase.name" placeholder="Name" class="phase-name" required />
-              <input v-model="phase.objective" placeholder="Objective" class="phase-objective" required />
-              <select v-model="phase.status">
-                <option v-for="s in PHASE_STATUSES" :key="s" :value="s">{{ s }}</option>
-              </select>
-              <button type="button" class="btn-remove" @click="removePhase(i)" title="Remove">✕</button>
+            <div v-for="(phase, i) in planForm.phases" :key="phase.id" class="phase-card">
+              <div class="phase-card-header">
+                <span class="phase-num">Phase {{ i + 1 }}</span>
+                <button type="button" class="btn-remove" @click="removePhase(i)">✕ Remove</button>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Name</label>
+                  <input v-model="phase.name" required placeholder="e.g. Implementation" />
+                </div>
+                <div class="field field-status">
+                  <label>Status</label>
+                  <select v-model="phase.status">
+                    <option v-for="s in PHASE_STATUSES" :key="s" :value="s">{{ s }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label>Objective</label>
+                <input v-model="phase.objective" required placeholder="e.g. Write the auth middleware" />
+              </div>
             </div>
             <button type="button" class="btn-add-phase" @click="addPhase">+ Add Phase</button>
           </div>
@@ -258,17 +272,35 @@ function formatDateTime(iso: string): string {
           <div v-if="readiness" class="readiness">
             <h3>Readiness</h3>
             <div class="readiness-grid">
-              <div v-for="(label, key) in {
-                blockingQuestionsResolved: 'Blocking questions resolved',
-                allPhasesComplete: 'All phases complete',
-                verificationReady: 'Verification ready',
-                readyForReview: 'Ready for review',
-                readyForPR: 'Ready for PR',
-              }" :key="key" class="readiness-item">
-                <span class="gate-icon" :class="readiness[key as keyof ReadinessState] ? 'ok' : 'pending'">
-                  {{ readiness[key as keyof ReadinessState] ? '✓' : '○' }}
+              <div class="readiness-item">
+                <span class="gate-icon" :class="readiness.blockingQuestionsResolved ? 'ok' : 'pending'">
+                  {{ readiness.blockingQuestionsResolved ? '✓' : '○' }}
                 </span>
-                {{ label }}
+                Blocking questions resolved
+              </div>
+              <div class="readiness-item">
+                <span class="gate-icon" :class="readiness.allPhasesComplete ? 'ok' : 'pending'">
+                  {{ readiness.allPhasesComplete ? '✓' : '○' }}
+                </span>
+                All phases complete
+              </div>
+              <div class="readiness-item">
+                <span class="gate-icon" :class="readiness.verificationReady ? 'ok' : 'pending'">
+                  {{ readiness.verificationReady ? '✓' : '○' }}
+                </span>
+                Verification ready
+              </div>
+              <div class="readiness-item">
+                <span class="gate-icon" :class="readiness.readyForReview ? 'ok' : 'pending'">
+                  {{ readiness.readyForReview ? '✓' : '○' }}
+                </span>
+                Ready for review
+              </div>
+              <div class="readiness-item">
+                <span class="gate-icon" :class="readiness.readyForPR ? 'ok' : 'pending'">
+                  {{ readiness.readyForPR ? '✓' : '○' }}
+                </span>
+                Ready for PR
               </div>
             </div>
           </div>
@@ -422,34 +454,41 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
 
 .phase-name-text { color: #374151; }
 
-/* Plan form */
-.phase-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.4rem;
-}
-
-.phase-row input, .phase-row select {
-  padding: 0.35rem 0.55rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-family: inherit;
+/* Plan form — phase cards */
+.phase-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem;
   background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
-.phase-name      { flex: 1.2; }
-.phase-objective { flex: 2; }
+.phase-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.phase-num {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+
+.field-status { max-width: 160px; }
 
 .btn-remove {
   background: none;
   border: none;
   color: #9ca3af;
   cursor: pointer;
-  font-size: 0.9rem;
-  padding: 0.2rem;
-  line-height: 1;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.35rem;
 }
 .btn-remove:hover { color: #ef4444; }
 
