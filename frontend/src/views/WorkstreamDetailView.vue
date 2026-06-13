@@ -65,6 +65,14 @@ function openPlanForm() {
   showPlanForm.value = true
 }
 
+function addAssumption() {
+  planForm.value.assumptions.push('')
+}
+
+function removeAssumption(index: number) {
+  planForm.value.assumptions.splice(index, 1)
+}
+
 function addQuestion() {
   planForm.value.openQuestions.push({
     id: Math.random().toString(36).slice(2, 10),
@@ -263,6 +271,16 @@ function formatDateTime(iso: string): string {
           </div>
 
           <div class="field">
+            <label>Assumptions</label>
+            <div v-if="planForm.assumptions.length === 0" class="muted small">No assumptions yet.</div>
+            <div v-for="(_, i) in planForm.assumptions" :key="i" class="assumption-row">
+              <input v-model="planForm.assumptions[i]" required placeholder="e.g. Postgres is available" />
+              <button type="button" class="btn-remove" @click="removeAssumption(i)">✕</button>
+            </div>
+            <button type="button" class="btn-add-phase" @click="addAssumption">+ Add Assumption</button>
+          </div>
+
+          <div class="field">
             <label>Open Questions</label>
             <div v-if="planForm.openQuestions.length === 0" class="muted small">No open questions yet.</div>
             <div v-for="(q, i) in planForm.openQuestions" :key="q.id" class="phase-card">
@@ -331,6 +349,13 @@ function formatDateTime(iso: string): string {
         <!-- Plan display -->
         <div v-else-if="plan" class="card">
           <p class="plan-goal">{{ plan.goal }}</p>
+
+          <div v-if="plan.assumptions.length > 0" class="plan-subsection">
+            <h3>Assumptions</h3>
+            <ul class="assumptions-list">
+              <li v-for="(a, i) in plan.assumptions" :key="i">{{ a }}</li>
+            </ul>
+          </div>
 
           <div v-if="plan.openQuestions.length > 0" class="questions-list">
             <div v-for="q in plan.openQuestions" :key="q.id" class="question-item">
@@ -533,6 +558,29 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
 }
 
 .form-card { background: #f9fafb; }
+
+/* Assumptions form row */
+.assumption-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.assumption-row input { flex: 1; }
+
+/* Plan sub-sections (assumptions, etc.) */
+.plan-subsection { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.assumptions-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
 
 /* Open questions display */
 .questions-list {
