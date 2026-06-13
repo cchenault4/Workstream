@@ -348,7 +348,10 @@ function formatDateTime(iso: string): string {
 
         <!-- Plan display -->
         <div v-else-if="plan" class="card">
-          <p class="plan-goal">{{ plan.goal }}</p>
+          <div class="plan-subsection">
+            <h3>Goal</h3>
+            <p class="plan-goal">{{ plan.goal }}</p>
+          </div>
 
           <div v-if="plan.assumptions.length > 0" class="plan-subsection">
             <h3>Assumptions</h3>
@@ -357,21 +360,27 @@ function formatDateTime(iso: string): string {
             </ul>
           </div>
 
-          <div v-if="plan.openQuestions.length > 0" class="questions-list">
-            <div v-for="q in plan.openQuestions" :key="q.id" class="question-item">
-              <span class="badge" :class="QUESTION_TYPE_CLASS[q.type]">{{ q.type }}</span>
-              <div class="question-body">
-                <span class="question-text">{{ q.question }}</span>
-                <span v-if="q.resolution" class="question-resolution">→ {{ q.resolution }}</span>
-                <span v-else-if="q.type === 'BLOCKING'" class="question-unresolved">⚠ Unresolved</span>
+          <div v-if="plan.openQuestions.length > 0" class="plan-subsection">
+            <h3>Open Questions</h3>
+            <div class="questions-list">
+              <div v-for="q in plan.openQuestions" :key="q.id" class="question-item">
+                <span class="badge" :class="QUESTION_TYPE_CLASS[q.type]">{{ q.type }}</span>
+                <div class="question-body">
+                  <span class="question-text">{{ q.question }}</span>
+                  <span v-if="q.resolution" class="question-resolution">→ {{ q.resolution }}</span>
+                  <span v-else-if="q.type === 'BLOCKING'" class="question-unresolved">⚠ Unresolved</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div v-if="plan.phases.length > 0" class="phases-list">
-            <div v-for="phase in plan.phases" :key="phase.id" class="phase-item">
-              <span class="badge" :class="PHASE_CLASS[phase.status]">{{ phase.status }}</span>
-              <span class="phase-name-text"><strong>{{ phase.name }}</strong> — {{ phase.objective }}</span>
+          <div v-if="plan.phases.length > 0" class="plan-subsection">
+            <h3>Phases</h3>
+            <div class="phases-list">
+              <div v-for="phase in plan.phases" :key="phase.id" class="phase-item">
+                <span class="badge" :class="PHASE_CLASS[phase.status]">{{ phase.status }}</span>
+                <span class="phase-name-text"><strong>{{ phase.name }}</strong> — {{ phase.objective }}</span>
+              </div>
             </div>
           </div>
 
