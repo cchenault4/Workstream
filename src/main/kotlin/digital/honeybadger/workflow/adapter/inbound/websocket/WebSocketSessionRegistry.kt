@@ -54,7 +54,7 @@ class DefaultWebSocketSessionRegistry : WebSocketSessionRegistry {
 
     override suspend fun broadcast(workstreamId: String, message: String) {
         val sessions = rooms[workstreamId]
-        log.info("broadcast room={} sessionCount={} message={}", workstreamId, sessions?.size ?: 0, message)
+        log.debug("broadcast room={} sessionCount={} message={}", workstreamId, sessions?.size ?: 0, message)
         if (sessions == null) return
         val dead = mutableSetOf<DefaultWebSocketSession>()
         sessions.forEach { session ->
