@@ -188,8 +188,6 @@ onUnmounted(() => {
 <style scoped>
 .page {
   padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -285,35 +283,36 @@ input:focus, textarea:focus, select:focus {
 
 /* Table */
 table {
-  width: 100%;
+  width: auto;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
 
 th {
   text-align: left;
-  padding: 0.6rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   border-bottom: 2px solid #e5e7eb;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #6b7280;
+  white-space: nowrap;
 }
 
 td {
-  padding: 0.75rem;
+  padding: 0.55rem 0.75rem;
   border-bottom: 1px solid #f3f4f6;
   color: #111827;
+  white-space: nowrap;
 }
 
 tr:last-child td { border-bottom: none; }
 tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: #f9fafb; }
 
-.cell-title    { font-weight: 500; }
-.cell-presence { width: 80px; }
-.cell-date     { color: #9ca3af; white-space: nowrap; }
+.cell-title { font-weight: 500; white-space: normal; min-width: 200px; }
+.cell-date  { color: #9ca3af; }
 
 .badge-active { background: #d1fae5; color: #065f46; }
 
@@ -326,6 +325,7 @@ tr.clickable:hover td { background: #f9fafb; }
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .badge-low      { background: #f3f4f6; color: #6b7280; }

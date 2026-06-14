@@ -598,8 +598,6 @@ function formatDateTime(iso: string): string {
 <style scoped>
 .page {
   padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 2rem;
@@ -617,7 +615,7 @@ function formatDateTime(iso: string): string {
 }
 .btn-back:hover { color: #111827; }
 
-h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+h1 { font-size: 1.5rem; font-weight: 600; margin: 0; flex: 1; min-width: 0; }
 h2 { font-size: 1rem; font-weight: 600; margin: 0; }
 h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin: 0 0 0.5rem; }
 
@@ -635,10 +633,10 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
 }
 
 .ws-edit-actions {
-  margin-left: auto;
   display: flex;
   gap: 0.4rem;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .ws-description {
@@ -703,6 +701,7 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
   text-transform: uppercase;
   border: none;
   cursor: pointer;
+  width: auto;
 }
 
 /* Section */
