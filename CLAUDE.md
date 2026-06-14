@@ -4,77 +4,162 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Kotlin backend service** for an agentic workstream system. It models how engineering work moves through an AI-assisted workflow: workstreams are created, implementation plans are attached, agents emit activity events, and participants receive real-time updates via Socket.IO.
+Full-stack agentic workstream system: a **Kotlin/Ktor backend** and a **Vue 3 SPA frontend**.
+Engineering work moves through an AI-assisted workflow — workstreams are created, implementation
+plans are attached, agents emit activity events, and participants receive real-time updates via
+WebSocket.
 
-The full spec is in `README.md`. An `AI_DEVELOPMENT_LOG.md` documenting AI tool usage is required as part of the submission.
+The full spec is in `SPEC.md`. `README.md` is the human-facing docs. `AI_DEVELOPMENT_LOG.md`
+documents AI tool usage and is required as part of the submission.
 
 ## Domain Model
 
-**Workstream** — the top-level unit of work:
-- Fields: `id`, `title`, `description`, `requester`, `priority` (`low|medium|high`), `status` (`new|planning|executing|reviewing|verified|blocked`), `createdAt`, `updatedAt`
+**Workstream** — top-level unit of work:
+- Fields: `id`, `title`, `description`, `requester`, `priority` (`LOW|MEDIUM|HIGH`), `status` (`NEW|PLANNING|EXECUTING|REVIEWING|VERIFIED|BLOCKED`), `createdAt`, `updatedAt`
 
-**Implementation Plan** — attached to a workstream (one per workstream):
+**Implementation Plan** — one per workstream:
 - Fields: `goal`, `nonGoals[]`, `assumptions[]`, `openQuestions[]`, `phases[]`, `verificationPlan[]`
-- `openQuestions` have a `type`: `blocking|assumable|deferrable` and optional `resolution`
-- `phases` have a `status`: `pending|in_progress|complete|blocked`
-- Exposes derived **readiness state**: `blockingQuestionsResolved`, `allPhasesComplete`, `verificationReady`, `readyForReview`, `readyForPR`
+- `openQuestions.type`: `BLOCKING|ASSUMABLE|DEFERRABLE`; optional `resolution`
+- `phases.status`: `PENDING|IN_PROGRESS|COMPLETE|BLOCKED`
+- Derived readiness: `blockingQuestionsResolved`, `allPhasesComplete`, `verificationReady`, `readyForReview`, `readyForPR`
 
 **ActivityEvent** — emitted by agents against a workstream:
-- Fields: `id`, `workstreamId`, `agentName`, `type` (`context_discovery|planning|implementation|review|verification|handoff`), `message`, `createdAt`
-- Creating an event must broadcast it in real time to Socket.IO subscribers
+- Fields: `id`, `workstreamId`, `agentName`, `type` (`CONTEXT_DISCOVERY|PLANNING|IMPLEMENTATION|REVIEW|VERIFICATION|HANDOFF`), `message`, `createdAt`
+- Creating an event broadcasts it in real time to WebSocket subscribers
 
 ## REST API
 
 ```
-POST   /workstreams
-GET    /workstreams
-GET    /workstreams/:id
-PATCH  /workstreams/:id
-PUT    /workstreams/:id/plan
-GET    /workstreams/:id/plan
-GET    /workstreams/:id/readiness
-POST   /workstreams/:id/activity
-GET    /workstreams/:id/activity
+POST   /workstreams          → Workstream
+GET    /workstreams          → WorkstreamSummary[]  (includes active: Boolean derived from registry)
+GET    /workstreams/:id      → Workstream
+PATCH  /workstreams/:id      → Workstream
+PUT    /workstreams/:id/plan → Plan
+GET    /workstreams/:id/plan → Plan
+GET    /workstreams/:id/readiness → ReadinessState
+POST   /workstreams/:id/activity  → ActivityEvent
+GET    /workstreams/:id/activity  → ActivityEvent[]
 ```
 
-## Real-Time (Socket.IO)
+`GET /workstreams` returns `WorkstreamSummary` (not `Workstream`) — a DTO in
+`adapter/inbound/http/WorkstreamSummary.kt` that adds `active: Boolean` derived at request time
+from `registry.activeRooms()`. The domain `Workstream` model has no `active` field.
 
-Clients join/leave workstream rooms and receive broadcasts:
-- Client → server: `workstream:join { workstreamId }`, `workstream:leave { workstreamId }`
-- Server → client: `activity:created <activityEvent>`, `workstream:updated <workstream>`, `plan:updated <plan>`
+## Real-Time (Ktor WebSockets — not Socket.IO)
 
-## Commands
+There is no Socket.IO library for Ktor. Real-time uses native Ktor WebSockets with a JSON envelope
+protocol. The `WebSocketSessionRegistry` manages rooms; `WebSocketEventPublisher` broadcasts.
+
+**Client → server:**
+```json
+{ "type": "workstream:join",      "workstreamId": "<id>" }   // detail page: subscribe to one workstream
+{ "type": "workstream:leave",     "workstreamId": "<id>" }   // detail page: unsubscribe
+{ "type": "workstreams:subscribe"                        }   // list page: subscribe to all presence + updates
+```
+
+**Server → client:**
+```json
+{ "type": "activity:created",    "data": { ...ActivityEvent } }
+{ "type": "workstream:updated",  "data": { ...Workstream } }
+{ "type": "plan:updated",        "data": { ...Plan } }
+{ "type": "workstream:presence", "data": { "workstreamId": "<id>", "active": true } }
+```
+
+`workstream:presence` is sent to `workstreams:subscribe` clients when any client joins or leaves a
+workstream room. The list page uses this to drive the "Active" badge in real time.
+
+**Internal rooms:** `__workstreams__` is an internal room (filtered from `activeRooms()` by the
+`__` prefix convention). The publisher broadcasts `workstream:updated` to both the workstream's
+own room and `__workstreams__` so list-page subscribers also receive data updates.
+
+## Backend Commands
+
+Run from the project root (`/Users/chrischenault/IdeaProjects/Workstream`), **not** from `frontend/`:
 
 ```bash
-gradle test          # run all tests
-gradle test --tests "digital.honeybadger.workflow.SomeTest"  # run single test class
-gradle run           # start the server (port 8080)
+gradle test          # run all 81 backend tests
+gradle test --tests "digital.honeybadger.workflow.SomeTest"
+gradle run           # start server on port 8080
 gradle build         # compile + test + assemble jar
+gradle clean run     # clean rebuild before starting (use when stale binary suspected)
 ```
 
-## Wiring
+## Frontend Commands
 
-All manual DI lives in `Application.kt:module()`. The composition order is:
-1. In-memory repositories and `DefaultWebSocketSessionRegistry` are created
-2. `WebSocketEventPublisher` is created with the `Application` as its `CoroutineScope`
-3. Use cases are created with their repositories and publisher
-4. `configurePlugins()` → `configureRouting()` (health) → `configureHttpRoutes(...)` → `configureWebSocketRoutes(...)`
+Run from `frontend/`:
 
-## Tech Stack
+```bash
+npm run dev          # Vite dev server on http://localhost:5173
+npm test             # run all 64 tests (single pass)
+npm run test:watch   # run tests in watch mode
+```
 
-**Kotlin 2.2.0 + Ktor 3.1.3 + Gradle 9.x**, JVM target 24, in-memory storage (no DB). Real-time via Ktor WebSockets (not Socket.IO — no server-side Socket.IO library exists for Ktor).
+The Vite dev server proxies `/api/*` → `http://localhost:8080` (strips `/api` prefix) and
+`/ws` → `ws://localhost:8080` so the frontend talks directly to the backend with no CORS config.
 
-## Architecture
+## Backend Architecture
 
-Hexagonal (Ports & Adapters):
-- `domain/model/` — pure data classes and enums, no framework deps
-- `domain/service/` — `ReadinessService`: pure computation of derived readiness state from a `Plan`
-- `application/port/inbound/` — use case interfaces (`WorkstreamUseCase`, `PlanUseCase`, `ActivityUseCase`)
-- `application/port/outbound/` — repository + event publisher interfaces
-- `application/usecase/` — implements inbound ports, depends only on outbound ports
-- `adapter/inbound/http/` — Ktor routes, depend on inbound port interfaces
-- `adapter/inbound/websocket/` — Ktor WebSocket handler + room registry
-- `adapter/outbound/persistence/` — `InMemory*` repository implementations
-- `adapter/outbound/realtime/` — `WebSocketEventPublisher`
+Hexagonal (Ports & Adapters). Manual DI in `Application.kt:module()`:
 
-Wiring (manual DI) happens in `Application.kt`.
+1. In-memory repositories and `DefaultWebSocketSessionRegistry` created
+2. `WebSocketEventPublisher` created with the `Application` as its `CoroutineScope`
+3. Use cases created with repositories and publisher
+4. `configurePlugins()` → `configureRouting()` → `configureHttpRoutes(...)` → `configureWebSocketRoutes(...)`
+
+```
+domain/model/           — pure data classes/enums, no framework deps
+domain/service/         — ReadinessService: pure computation, no I/O
+application/port/inbound/  — WorkstreamUseCase, PlanUseCase, ActivityUseCase (interfaces)
+application/port/outbound/ — repository + EventPublisher interfaces
+application/usecase/    — implements inbound ports, depends only on outbound ports
+adapter/inbound/http/   — Ktor routes + StatusPages; WorkstreamSummary DTO lives here
+adapter/inbound/websocket/ — WebSocket route, DefaultWebSocketSessionRegistry
+adapter/outbound/persistence/ — InMemory* repositories
+adapter/outbound/realtime/    — WebSocketEventPublisher
+```
+
+## Frontend Architecture
+
+```
+frontend/src/
+  api/workstreams.ts      — typed fetch wrappers for all REST endpoints
+  composables/
+    useWorkstreamSocket.ts — useWorkstreamSocket (detail page) + useWorkstreamsSocket (list page)
+  components/
+    Badge.vue              — <span class="badge" :class="variant">{{ label }}</span>
+    StringList.vue         — read-only bulleted list; renders nothing when items is empty
+    StringListField.vue    — editable list with add/remove; uses defineModel
+  views/
+    WorkstreamsView.vue    — list + create form; uses useWorkstreamsSocket
+    WorkstreamDetailView.vue — header + 3 tabs (plan / readiness / activity)
+  types/workstream.ts     — all shared TypeScript interfaces
+  utils/badges.ts         — PRIORITY_CLASS, STATUS_CLASS, etc. badge variant maps
+  utils/format.ts         — formatDate, formatDateTime
+  __tests__/              — Vitest suite (mocks/websocket.ts, utils, components, composables, views)
+```
+
+**WebSocket composables:**
+- `useWorkstreamSocket(id, handlers)` — joins/leaves a single workstream room; calls
+  `onActivity`, `onWorkstreamUpdated`, `onPlanUpdated` handlers; sends `workstream:leave` on unmount
+- `useWorkstreamsSocket(handlers?)` — sends `workstreams:subscribe`; updates `activeWorkstreamIds`
+  ref on `workstream:presence` messages; calls `onWorkstreamUpdated` handler
+
+**Dedup pattern:** Both activity creation and workstream creation have a race condition where the
+WebSocket broadcast arrives before the POST response. The guard is:
+```typescript
+if (!list.value.some(item => item.id === incoming.id)) {
+  list.value.unshift(incoming)
+}
+```
+Applied in `addActivity()`, `submit()` (WorkstreamsView), and the WS `onActivity` handler.
+
+## Tech Stack Summary
+
+| | Backend | Frontend |
+|---|---|---|
+| Language | Kotlin 2.2.0 | TypeScript |
+| Framework | Ktor 3.1.3 (Netty) | Vue 3.5 + Vite 8 |
+| Build | Gradle 9.x (Kotlin DSL) | npm |
+| Testing | MockK + testApplication (81 tests) | Vitest + @vue/test-utils (64 tests) |
+| Storage | In-memory (no DB) | — |
+| Real-time | Ktor WebSockets | Native WebSocket API |
