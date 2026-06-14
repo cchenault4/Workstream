@@ -146,7 +146,9 @@ async function addActivity() {
   activityFormError.value = null
   try {
     const event = await workstreamsApi.addActivity(id, activityForm.value)
-    activities.value.unshift(event)
+    if (!activities.value.some(a => a.id === event.id)) {
+      activities.value.unshift(event)
+    }
   } catch (e) {
     activityFormError.value = e instanceof Error ? e.message : 'Failed to add event'
     activitySaving.value = false
@@ -478,12 +480,7 @@ function formatDateTime(iso: string): string {
       <!-- ── Activity ──────────────────────────────────────────────────────── -->
       <section>
         <div class="section-header">
-          <div class="section-title-row">
-            <h2>Activity</h2>
-            <span class="live-indicator" :class="connected ? 'live' : 'offline'">
-              {{ connected ? '● Live' : '○ Offline' }}
-            </span>
-          </div>
+          <h2>Activity</h2>
           <button class="btn-secondary" @click="showActivityForm = !showActivityForm">
             {{ showActivityForm ? 'Cancel' : '+ Add Event' }}
           </button>
@@ -592,20 +589,6 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
   justify-content: space-between;
   margin-bottom: 0.75rem;
 }
-
-.section-title-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.live-indicator {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-}
-.live-indicator.live    { color: #059669; }
-.live-indicator.offline { color: #9ca3af; }
 
 .card {
   border: 1px solid #e5e7eb;

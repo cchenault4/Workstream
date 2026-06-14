@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { workstreamsApi } from '../api/workstreams'
 import type { CreateWorkstreamRequest, Priority, Workstream } from '../types/workstream'
 
 const workstreams = ref<Workstream[]>([])
 const loading = ref(true)
 const loadError = ref<string | null>(null)
+const activeWorkstreamIds = ref<string[]>([])
 
 const showForm = ref(false)
 const submitting = ref(false)
@@ -69,7 +70,32 @@ const STATUS_CLASS: Record<Workstream['status'], string> = {
   BLOCKED: 'badge-blocked',
 }
 
-onMounted(load)
+let presenceSocket: WebSocket | null = null
+
+onMounted(() => {
+  load()
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  presenceSocket = new WebSocket(`${protocol}//${window.location.host}/ws`)
+  presenceSocket.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data as string)
+      if (msg.type === 'workstream:presence') {
+        const { workstreamId, active } = msg.data as { workstreamId: string; active: boolean }
+        if (active) {
+          if (!activeWorkstreamIds.value.includes(workstreamId)) {
+            activeWorkstreamIds.value = [...activeWorkstreamIds.value, workstreamId]
+          }
+        } else {
+          activeWorkstreamIds.value = activeWorkstreamIds.value.filter(id => id !== workstreamId)
+        }
+      }
+    } catch { /* ignore malformed frames */ }
+  }
+})
+
+onUnmounted(() => {
+  presenceSocket?.close()
+})
 </script>
 
 <template>
@@ -133,6 +159,7 @@ onMounted(load)
       <thead>
         <tr>
           <th>Title</th>
+          <th></th>
           <th>Requester</th>
           <th>Priority</th>
           <th>Status</th>
@@ -142,6 +169,9 @@ onMounted(load)
       <tbody>
         <tr v-for="ws in workstreams" :key="ws.id" class="clickable" @click="$router.push(`/workstreams/${ws.id}`)">
           <td class="cell-title">{{ ws.title }}</td>
+          <td class="cell-presence">
+            <span v-if="activeWorkstreamIds.includes(ws.id)" class="badge badge-active">● Active</span>
+          </td>
           <td>{{ ws.requester }}</td>
           <td><span class="badge" :class="PRIORITY_CLASS[ws.priority]">{{ ws.priority }}</span></td>
           <td><span class="badge" :class="STATUS_CLASS[ws.status]">{{ ws.status }}</span></td>
@@ -278,8 +308,11 @@ tr:last-child td { border-bottom: none; }
 tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: #f9fafb; }
 
-.cell-title { font-weight: 500; }
-.cell-date  { color: #9ca3af; white-space: nowrap; }
+.cell-title    { font-weight: 500; }
+.cell-presence { width: 80px; }
+.cell-date     { color: #9ca3af; white-space: nowrap; }
+
+.badge-active { background: #d1fae5; color: #065f46; }
 
 /* Badges */
 .badge {

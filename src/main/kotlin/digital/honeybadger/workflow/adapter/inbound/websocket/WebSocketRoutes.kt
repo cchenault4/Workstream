@@ -20,6 +20,7 @@ import io.ktor.websocket.*
 fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry) {
     routing {
         webSocket("/ws") {
+            registry.track(this)
             val joinedRooms = mutableSetOf<String>()
             try {
                 for (frame in incoming) {
@@ -34,18 +35,26 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry) {
                         "workstream:join" -> {
                             registry.join(msg.workstreamId, this)
                             joinedRooms.add(msg.workstreamId)
+                            registry.broadcastAll(presenceMessage(msg.workstreamId, true))
                         }
                         "workstream:leave" -> {
                             registry.leave(msg.workstreamId, this)
                             joinedRooms.remove(msg.workstreamId)
+                            registry.broadcastAll(presenceMessage(msg.workstreamId, registry.roomSize(msg.workstreamId) > 0))
                         }
                     }
                 }
             } finally {
-                // Ensure the session is removed from every room it joined, regardless of
-                // how the connection closed (client disconnect, server error, etc.).
-                joinedRooms.forEach { registry.leave(it, this) }
+                // Untrack before broadcasting so the closed session isn't a delivery target.
+                registry.untrack(this)
+                joinedRooms.forEach { wid ->
+                    registry.leave(wid, this)
+                    registry.broadcastAll(presenceMessage(wid, registry.roomSize(wid) > 0))
+                }
             }
         }
     }
 }
+
+private fun presenceMessage(workstreamId: String, active: Boolean): String =
+    """{"type":"workstream:presence","data":{"workstreamId":"$workstreamId","active":$active}}"""

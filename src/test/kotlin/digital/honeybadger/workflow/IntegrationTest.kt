@@ -130,11 +130,15 @@ class IntegrationTest {
                 }
             }
 
-            // Receive the broadcast and assert it contains the expected event type and agent
-            val frame = incoming.receive() as Frame.Text
-            val text = frame.readText()
-            assertTrue(text.contains("activity:created"), "Expected 'activity:created' in: $text")
-            assertTrue(text.contains("Plan Critic"), "Expected agent name in: $text")
+            // Drain frames until we find activity:created (join triggers a presence broadcast first)
+            var activityText: String? = null
+            for (f in incoming) {
+                if (f !is Frame.Text) continue
+                val text = f.readText()
+                if (text.contains("activity:created")) { activityText = text; break }
+            }
+            assertNotNull(activityText, "Never received activity:created frame")
+            assertTrue(activityText!!.contains("Plan Critic"), "Expected agent name in: $activityText")
         }
     }
 }
