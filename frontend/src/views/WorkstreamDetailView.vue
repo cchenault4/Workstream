@@ -65,6 +65,14 @@ function openPlanForm() {
   showPlanForm.value = true
 }
 
+function addNonGoal() {
+  planForm.value.nonGoals.push('')
+}
+
+function removeNonGoal(index: number) {
+  planForm.value.nonGoals.splice(index, 1)
+}
+
 function addAssumption() {
   planForm.value.assumptions.push('')
 }
@@ -84,6 +92,14 @@ function addQuestion() {
 
 function removeQuestion(index: number) {
   planForm.value.openQuestions.splice(index, 1)
+}
+
+function addVerificationStep() {
+  planForm.value.verificationPlan.push('')
+}
+
+function removeVerificationStep(index: number) {
+  planForm.value.verificationPlan.splice(index, 1)
 }
 
 function addPhase() {
@@ -271,6 +287,16 @@ function formatDateTime(iso: string): string {
           </div>
 
           <div class="field">
+            <label>Non-Goals</label>
+            <div v-if="planForm.nonGoals.length === 0" class="muted small">No non-goals yet.</div>
+            <div v-for="(_, i) in planForm.nonGoals" :key="i" class="assumption-row">
+              <input v-model="planForm.nonGoals[i]" required placeholder="e.g. We are not supporting SSO" />
+              <button type="button" class="btn-remove" @click="removeNonGoal(i)">✕</button>
+            </div>
+            <button type="button" class="btn-add-phase" @click="addNonGoal">+ Add Non-Goal</button>
+          </div>
+
+          <div class="field">
             <label>Assumptions</label>
             <div v-if="planForm.assumptions.length === 0" class="muted small">No assumptions yet.</div>
             <div v-for="(_, i) in planForm.assumptions" :key="i" class="assumption-row">
@@ -336,6 +362,16 @@ function formatDateTime(iso: string): string {
             <button type="button" class="btn-add-phase" @click="addPhase">+ Add Phase</button>
           </div>
 
+          <div class="field">
+            <label>Verification Plan</label>
+            <div v-if="planForm.verificationPlan.length === 0" class="muted small">No verification steps yet.</div>
+            <div v-for="(_, i) in planForm.verificationPlan" :key="i" class="assumption-row">
+              <input v-model="planForm.verificationPlan[i]" required placeholder="e.g. Run integration tests against staging" />
+              <button type="button" class="btn-remove" @click="removeVerificationStep(i)">✕</button>
+            </div>
+            <button type="button" class="btn-add-phase" @click="addVerificationStep">+ Add Step</button>
+          </div>
+
           <p v-if="planFormError" class="error">{{ planFormError }}</p>
 
           <div class="form-actions">
@@ -351,6 +387,13 @@ function formatDateTime(iso: string): string {
           <div class="plan-subsection">
             <h3>Goal</h3>
             <p class="plan-goal">{{ plan.goal }}</p>
+          </div>
+
+          <div v-if="plan.nonGoals.length > 0" class="plan-subsection">
+            <h3>Non-Goals</h3>
+            <ul class="assumptions-list">
+              <li v-for="(ng, i) in plan.nonGoals" :key="i">{{ ng }}</li>
+            </ul>
           </div>
 
           <div v-if="plan.assumptions.length > 0" class="plan-subsection">
@@ -382,6 +425,13 @@ function formatDateTime(iso: string): string {
                 <span class="phase-name-text"><strong>{{ phase.name }}</strong> — {{ phase.objective }}</span>
               </div>
             </div>
+          </div>
+
+          <div v-if="plan.verificationPlan.length > 0" class="plan-subsection">
+            <h3>Verification Plan</h3>
+            <ul class="assumptions-list">
+              <li v-for="(step, i) in plan.verificationPlan" :key="i">{{ step }}</li>
+            </ul>
           </div>
 
           <!-- Readiness -->
