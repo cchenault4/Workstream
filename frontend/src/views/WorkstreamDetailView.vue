@@ -9,6 +9,7 @@ import type {
   CreateActivityEventRequest,
   PhaseStatus,
   Plan,
+  Priority,
   QuestionType,
   ReadinessState,
   UpsertPlanRequest,
@@ -39,6 +40,41 @@ async function updateStatus(status: WorkstreamStatus) {
   } finally {
     statusSaving.value = false
   }
+}
+
+// ── Edit workstream (in-place) ────────────────────────────────────────────────
+const editing     = ref(false)
+const editSaving  = ref(false)
+const editError   = ref<string | null>(null)
+const editTitle   = ref('')
+const editDesc    = ref('')
+
+function startEdit() {
+  editTitle.value = workstream.value!.title
+  editDesc.value  = workstream.value!.description
+  editError.value = null
+  editing.value   = true
+}
+
+async function saveEdit() {
+  editSaving.value = true
+  editError.value  = null
+  try {
+    workstream.value = await workstreamsApi.update(id, {
+      title: editTitle.value,
+      description: editDesc.value,
+    })
+    editing.value = false
+  } catch (e) {
+    editError.value = e instanceof Error ? e.message : 'Failed to save'
+  } finally {
+    editSaving.value = false
+  }
+}
+
+async function updatePriority(priority: Priority) {
+  if (!workstream.value) return
+  workstream.value = await workstreamsApi.update(id, { priority })
 }
 
 // ── Plan form ─────────────────────────────────────────────────────────────────
@@ -206,6 +242,7 @@ const { connected } = useWorkstreamSocket(id, {
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+const PRIORITIES: Priority[]        = ['LOW', 'MEDIUM', 'HIGH']
 const STATUSES: WorkstreamStatus[] = ['NEW', 'PLANNING', 'EXECUTING', 'REVIEWING', 'VERIFIED', 'BLOCKED']
 const ACTIVITY_TYPES: ActivityType[] = ['CONTEXT_DISCOVERY', 'PLANNING', 'IMPLEMENTATION', 'REVIEW', 'VERIFICATION', 'HANDOFF']
 const PHASE_STATUSES: PhaseStatus[]    = ['PENDING', 'IN_PROGRESS', 'COMPLETE', 'BLOCKED']
@@ -250,9 +287,44 @@ function formatDateTime(iso: string): string {
       <!-- Header -->
       <div class="ws-header">
         <button class="btn-back" @click="router.push('/workstreams')">← Workstreams</button>
-        <div class="ws-title-row">
-          <h1>{{ workstream.title }}</h1>
-          <span class="badge" :class="PRIORITY_CLASS[workstream.priority]">{{ workstream.priority }}</span>
+
+        <!-- Line 1: title (or input) · requester · created + Edit/Save/Cancel -->
+        <div class="ws-line1">
+          <h1 v-if="!editing">{{ workstream.title }}</h1>
+          <input v-else v-model="editTitle" class="edit-title" required />
+          <span v-if="!editing" class="ws-meta-inline">
+            <span class="sep">·</span>{{ workstream.requester }}<span class="sep">·</span>{{ formatDate(workstream.createdAt) }}
+          </span>
+          <div class="ws-edit-actions">
+            <template v-if="!editing">
+              <button class="btn-secondary btn-sm" @click="startEdit">Edit</button>
+            </template>
+            <template v-else>
+              <button type="button" class="btn-ghost btn-sm" @click="editing = false">Cancel</button>
+              <button type="button" class="btn-primary btn-sm" :disabled="editSaving" @click="saveEdit">
+                {{ editSaving ? 'Saving…' : 'Save' }}
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Line 2: description (or textarea) -->
+        <p v-if="!editing" class="ws-description">{{ workstream.description }}</p>
+        <textarea v-else v-model="editDesc" class="edit-desc" rows="2" />
+        <p v-if="editError" class="error small">{{ editError }}</p>
+
+        <!-- Line 3: priority + status with labels -->
+        <div class="ws-line3">
+          <span class="inline-label">Priority</span>
+          <select
+            class="status-select"
+            :class="PRIORITY_CLASS[workstream.priority]"
+            :value="workstream.priority"
+            @change="updatePriority(($event.target as HTMLSelectElement).value as Priority)"
+          >
+            <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <span class="inline-label">Status</span>
           <select
             class="status-select"
             :class="STATUS_CLASS[workstream.status]"
@@ -263,13 +335,6 @@ function formatDateTime(iso: string): string {
             <option v-for="s in STATUSES" :key="s" :value="s">{{ s }}</option>
           </select>
         </div>
-        <p class="ws-meta">
-          {{ workstream.description }}
-          <span class="sep">·</span>
-          Requested by <strong>{{ workstream.requester }}</strong>
-          <span class="sep">·</span>
-          Created {{ formatDate(workstream.createdAt) }}
-        </p>
       </div>
 
       <!-- ── Plan ─────────────────────────────────────────────────────────── -->
@@ -552,24 +617,82 @@ function formatDateTime(iso: string): string {
 }
 .btn-back:hover { color: #111827; }
 
-.ws-title-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
 h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
 h2 { font-size: 1rem; font-weight: 600; margin: 0; }
 h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin: 0 0 0.5rem; }
 
-.ws-meta {
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin-top: 0.4rem;
-  line-height: 1.6;
+.ws-line1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
-.sep { margin: 0 0.4rem; }
+
+.ws-meta-inline {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.ws-edit-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.ws-description {
+  font-size: 0.875rem;
+  color: #374151;
+  margin: 0.35rem 0 0;
+  line-height: 1.5;
+}
+
+.ws-line3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.inline-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.edit-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  border: none;
+  border-bottom: 2px solid #6366f1;
+  outline: none;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  color: #111827;
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-desc {
+  margin-top: 0.35rem;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  resize: vertical;
+}
+
+.edit-desc:focus { outline: 2px solid #6366f1; outline-offset: -1px; border-color: transparent; }
+
+.btn-sm { padding: 0.25rem 0.65rem; font-size: 0.8rem; }
+
+.sep { margin: 0 0.3rem; }
 
 .status-select {
   padding: 0.2rem 0.5rem;
