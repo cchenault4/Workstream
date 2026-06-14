@@ -248,6 +248,10 @@ const STATUSES: WorkstreamStatus[]   = ['NEW', 'PLANNING', 'EXECUTING', 'REVIEWI
 const ACTIVITY_TYPES: ActivityType[] = ['CONTEXT_DISCOVERY', 'PLANNING', 'IMPLEMENTATION', 'REVIEW', 'VERIFICATION', 'HANDOFF']
 const PHASE_STATUSES: PhaseStatus[]  = ['PENDING', 'IN_PROGRESS', 'COMPLETE', 'BLOCKED']
 const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+type Tab = 'plan' | 'readiness' | 'activity'
+const activeTab = ref<Tab>('plan')
 </script>
 
 <template>
@@ -313,10 +317,22 @@ const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
         </div>
       </div>
 
-      <!-- ── Plan ─────────────────────────────────────────────────────────── -->
-      <section>
+      <!-- ── Tabs ─────────────────────────────────────────────────────────── -->
+      <div class="tabs">
+        <button
+          v-for="tab in (['plan', 'readiness', 'activity'] as Tab[])"
+          :key="tab"
+          class="tab-btn"
+          :class="{ active: activeTab === tab }"
+          @click="activeTab = tab"
+        >
+          {{ tab === 'plan' ? 'Implementation Plan' : tab === 'readiness' ? 'Readiness' : 'Activity' }}
+        </button>
+      </div>
+
+      <!-- ── Implementation Plan tab ───────────────────────────────────── -->
+      <section v-if="activeTab === 'plan'">
         <div class="section-header">
-          <h2>Implementation Plan</h2>
           <button class="btn-secondary" @click="openPlanForm">
             {{ plan ? 'Edit Plan' : 'Add Plan' }}
           </button>
@@ -451,52 +467,53 @@ const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
           </div>
 
           <StringList heading="Verification Plan" :items="plan.verificationPlan" />
-
-          <!-- Readiness -->
-          <div v-if="readiness" class="readiness">
-            <h3>Readiness</h3>
-            <div class="readiness-grid">
-              <div class="readiness-item">
-                <span class="gate-icon" :class="readiness.blockingQuestionsResolved ? 'ok' : 'pending'">
-                  {{ readiness.blockingQuestionsResolved ? '✓' : '○' }}
-                </span>
-                Blocking questions resolved
-              </div>
-              <div class="readiness-item">
-                <span class="gate-icon" :class="readiness.allPhasesComplete ? 'ok' : 'pending'">
-                  {{ readiness.allPhasesComplete ? '✓' : '○' }}
-                </span>
-                All phases complete
-              </div>
-              <div class="readiness-item">
-                <span class="gate-icon" :class="readiness.verificationReady ? 'ok' : 'pending'">
-                  {{ readiness.verificationReady ? '✓' : '○' }}
-                </span>
-                Verification ready
-              </div>
-              <div class="readiness-item">
-                <span class="gate-icon" :class="readiness.readyForReview ? 'ok' : 'pending'">
-                  {{ readiness.readyForReview ? '✓' : '○' }}
-                </span>
-                Ready for review
-              </div>
-              <div class="readiness-item">
-                <span class="gate-icon" :class="readiness.readyForPR ? 'ok' : 'pending'">
-                  {{ readiness.readyForPR ? '✓' : '○' }}
-                </span>
-                Ready for PR
-              </div>
-            </div>
-          </div>
         </div>
 
         <div v-else class="state-msg muted">No implementation plan yet.</div>
       </section>
 
-      <!-- ── Activity ──────────────────────────────────────────────────────── -->
-      <section>
+      <!-- ── Readiness tab ──────────────────────────────────────────────── -->
+      <section v-else-if="activeTab === 'readiness'">
+        <div v-if="readiness" class="card">
+          <div class="readiness-grid">
+            <div class="readiness-item">
+              <span class="gate-icon" :class="readiness.blockingQuestionsResolved ? 'ok' : 'pending'">
+                {{ readiness.blockingQuestionsResolved ? '✓' : '○' }}
+              </span>
+              Blocking questions resolved
+            </div>
+            <div class="readiness-item">
+              <span class="gate-icon" :class="readiness.allPhasesComplete ? 'ok' : 'pending'">
+                {{ readiness.allPhasesComplete ? '✓' : '○' }}
+              </span>
+              All phases complete
+            </div>
+            <div class="readiness-item">
+              <span class="gate-icon" :class="readiness.verificationReady ? 'ok' : 'pending'">
+                {{ readiness.verificationReady ? '✓' : '○' }}
+              </span>
+              Verification ready
+            </div>
+            <div class="readiness-item">
+              <span class="gate-icon" :class="readiness.readyForReview ? 'ok' : 'pending'">
+                {{ readiness.readyForReview ? '✓' : '○' }}
+              </span>
+              Ready for review
+            </div>
+            <div class="readiness-item">
+              <span class="gate-icon" :class="readiness.readyForPR ? 'ok' : 'pending'">
+                {{ readiness.readyForPR ? '✓' : '○' }}
+              </span>
+              Ready for PR
+            </div>
+          </div>
+        </div>
+        <div v-else class="state-msg muted">No implementation plan — readiness is unavailable.</div>
+      </section>
+
+      <!-- ── Activity tab ───────────────────────────────────────────────── -->
+      <section v-else-if="activeTab === 'activity'">
         <div class="section-header">
-          <h2>Activity</h2>
           <button class="btn-secondary" @click="toggleActivityForm">
             {{ showActivityForm ? 'Cancel' : '+ Add Event' }}
           </button>
@@ -655,11 +672,38 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
   width: auto;
 }
 
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab-btn:hover { color: #374151; }
+
+.tab-btn.active {
+  color: #6366f1;
+  border-bottom-color: #6366f1;
+}
+
 /* Section */
 .section-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 0.75rem;
 }
 
@@ -772,11 +816,6 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
 .btn-add-phase:hover { border-color: #6b7280; color: #374151; }
 
 /* Readiness */
-.readiness {
-  border-top: 1px solid #f3f4f6;
-  padding-top: 1rem;
-}
-
 .readiness-grid {
   display: flex;
   flex-direction: column;

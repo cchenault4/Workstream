@@ -49,7 +49,9 @@ async function submit() {
   submitError.value = null
   try {
     const created = await workstreamsApi.createWorkstream(form.value)
-    workstreams.value.unshift(created)
+    if (!workstreams.value.some(ws => ws.id === created.id)) {
+      workstreams.value.unshift(created)
+    }
     showForm.value = false
     form.value = { title: '', description: '', requester: '', priority: 'MEDIUM' }
   } catch (e) {
