@@ -188,7 +188,7 @@ onUnmounted(() => {
 <style scoped>
 .page {
   padding: 2rem;
-  max-width: 900px;
+  max-width: 1400px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
