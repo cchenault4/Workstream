@@ -1,5 +1,6 @@
 package digital.honeybadger.workflow.adapter.inbound.http
 
+import digital.honeybadger.workflow.adapter.inbound.websocket.WebSocketSessionRegistry
 import digital.honeybadger.workflow.application.exception.PlanNotFoundException
 import digital.honeybadger.workflow.application.exception.WorkstreamNotFoundException
 import digital.honeybadger.workflow.application.port.inbound.ActivityUseCase
@@ -22,7 +23,8 @@ import io.ktor.server.routing.*
 fun Application.configureHttpRoutes(
     workstreamUseCase: WorkstreamUseCase,
     planUseCase: PlanUseCase,
-    activityUseCase: ActivityUseCase
+    activityUseCase: ActivityUseCase,
+    registry: WebSocketSessionRegistry,
 ) {
     install(StatusPages) {
         exception<WorkstreamNotFoundException> { call, cause ->
@@ -39,7 +41,7 @@ fun Application.configureHttpRoutes(
         }
     }
     routing {
-        workstreamRoutes(workstreamUseCase)
+        workstreamRoutes(workstreamUseCase, registry)
         planRoutes(planUseCase)
         activityRoutes(activityUseCase)
     }

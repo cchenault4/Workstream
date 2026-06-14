@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { workstreamsApi } from '../api/workstreams'
-import { usePresenceSocket } from '../composables/useWorkstreamSocket'
+import { useWorkstreamsSocket } from '../composables/useWorkstreamSocket'
 import { PRIORITY_CLASS, STATUS_CLASS } from '../utils/badges'
 import { formatDate } from '../utils/format'
 import Badge from '../components/Badge.vue'
@@ -10,7 +10,16 @@ import type { CreateWorkstreamRequest, Workstream } from '../types/workstream'
 const workstreams = ref<Workstream[]>([])
 const loading = ref(true)
 const loadError = ref<string | null>(null)
-const { activeWorkstreamIds } = usePresenceSocket()
+const { activeWorkstreamIds } = useWorkstreamsSocket({
+  onWorkstreamUpdated: (updated) => {
+    const i = workstreams.value.findIndex(ws => ws.id === updated.id)
+    if (i >= 0) {
+      workstreams.value[i] = { ...updated, active: activeWorkstreamIds.value.includes(updated.id) }
+    } else {
+      workstreams.value.unshift({ ...updated, active: false })
+    }
+  },
+})
 
 const showForm = ref(false)
 const submitting = ref(false)
@@ -27,6 +36,7 @@ async function load() {
   loadError.value = null
   try {
     workstreams.value = await workstreamsApi.listWorkstreams()
+    activeWorkstreamIds.value = workstreams.value.filter(ws => ws.active).map(ws => ws.id)
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : 'Failed to load'
   } finally {

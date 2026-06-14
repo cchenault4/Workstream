@@ -1,5 +1,6 @@
 package digital.honeybadger.workflow.adapter.inbound.http
 
+import digital.honeybadger.workflow.adapter.inbound.websocket.DefaultWebSocketSessionRegistry
 import digital.honeybadger.workflow.adapter.outbound.persistence.InMemoryActivityRepository
 import digital.honeybadger.workflow.adapter.outbound.persistence.InMemoryPlanRepository
 import digital.honeybadger.workflow.adapter.outbound.persistence.InMemoryWorkstreamRepository
@@ -39,7 +40,7 @@ class HttpRoutesTest {
         val activityService = ActivityService(workstreamRepo, activityRepo, publisher)
         application {
             configurePlugins()
-            configureHttpRoutes(workstreamService, planService, activityService)
+            configureHttpRoutes(workstreamService, planService, activityService, DefaultWebSocketSessionRegistry())
         }
     }
 
@@ -68,7 +69,7 @@ class HttpRoutesTest {
         setup()
         val response = jsonClient().get("/workstreams")
         assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals(emptyList(), response.body<List<Workstream>>())
+        assertEquals(emptyList(), response.body<List<WorkstreamSummary>>())
     }
 
     @Test
@@ -83,8 +84,9 @@ class HttpRoutesTest {
             contentType(ContentType.Application.Json)
             setBody(CreateWorkstreamRequest("Second", "Desc", "bob", Priority.HIGH))
         }
-        val body = client.get("/workstreams").body<List<Workstream>>()
+        val body = client.get("/workstreams").body<List<WorkstreamSummary>>()
         assertEquals(2, body.size)
+        body.forEach { assertEquals(false, it.active) }
     }
 
     @Test

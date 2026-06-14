@@ -33,8 +33,15 @@ class WebSocketEventPublisher(
     override fun publish(event: ActivityEvent) =
         broadcast(event.workstreamId, "activity:created", json.encodeToJsonElement(event))
 
-    override fun publishWorkstreamUpdate(workstream: Workstream) =
-        broadcast(workstream.id, "workstream:updated", json.encodeToJsonElement(workstream))
+    override fun publishWorkstreamUpdate(workstream: Workstream) {
+        val data = json.encodeToJsonElement(workstream)
+        // Notify clients in the workstream's own room (detail page) and the list-page room.
+        val message = json.encodeToString(WsServerMessage("workstream:updated", data))
+        scope.launch {
+            registry.broadcast(workstream.id, message)
+            registry.broadcast("__workstreams__", message)
+        }
+    }
 
     override fun publishPlanUpdate(plan: Plan) =
         broadcast(plan.workstreamId, "plan:updated", json.encodeToJsonElement(plan))

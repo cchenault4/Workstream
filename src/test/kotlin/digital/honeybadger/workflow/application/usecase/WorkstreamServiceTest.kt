@@ -45,6 +45,7 @@ class WorkstreamServiceTest {
         assertEquals(now, result.createdAt)
         assertEquals(now, result.updatedAt)
         verify(exactly = 1) { repository.save(any()) }
+        verify(exactly = 1) { publisher.publishWorkstreamUpdate(any()) }
     }
 
     @Test

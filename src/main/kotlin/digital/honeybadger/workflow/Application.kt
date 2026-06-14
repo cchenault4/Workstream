@@ -36,6 +36,6 @@ fun Application.module() {
     // Plugins, routes, WebSocket
     configurePlugins()
     configureRouting()
-    configureHttpRoutes(workstreamService, planService, activityService)
+    configureHttpRoutes(workstreamService, planService, activityService, sessionRegistry)
     configureWebSocketRoutes(sessionRegistry, scope = this)
 }

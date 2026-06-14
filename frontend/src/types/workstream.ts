@@ -27,6 +27,7 @@ export interface Workstream {
   requester: string
   priority: Priority
   status: WorkstreamStatus
+  active?: boolean
   createdAt: string
   updatedAt: string
 }

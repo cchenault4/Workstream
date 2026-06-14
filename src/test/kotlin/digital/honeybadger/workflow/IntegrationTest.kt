@@ -1,5 +1,6 @@
 package digital.honeybadger.workflow
 
+import digital.honeybadger.workflow.adapter.inbound.http.WorkstreamSummary
 import digital.honeybadger.workflow.application.dto.*
 import digital.honeybadger.workflow.domain.model.*
 import io.ktor.client.call.*
@@ -99,7 +100,7 @@ class IntegrationTest {
         assertEquals("Implementation Agent", events[3].agentName)
 
         // Workstream appears in list
-        val all = client.get("/workstreams").body<List<Workstream>>()
+        val all = client.get("/workstreams").body<List<WorkstreamSummary>>()
         assertTrue(all.any { it.id == ws.id })
     }
 

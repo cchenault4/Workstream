@@ -67,13 +67,16 @@ export function useWorkstreamSocket(workstreamId: string, handlers: Handlers) {
   return { connected }
 }
 
+interface WorkstreamsHandlers {
+  onWorkstreamUpdated?: (workstream: Workstream) => void
+}
+
 /**
- * Subscribes to workstream presence updates for all workstreams.
- * Connects to /ws, sends presence:subscribe, and maintains the list of
- * workstream IDs that currently have at least one active viewer.
- * Closes the connection on unmount.
+ * Subscribes to the __workstreams__ channel which delivers both presence
+ * updates (workstream:presence) and data updates (workstream:updated) for
+ * all workstreams. Used by the workstreams list page.
  */
-export function usePresenceSocket(): { activeWorkstreamIds: Ref<string[]> } {
+export function useWorkstreamsSocket(handlers?: WorkstreamsHandlers): { activeWorkstreamIds: Ref<string[]> } {
   const activeWorkstreamIds = ref<string[]>([])
   let mounted = true
 
@@ -81,7 +84,7 @@ export function usePresenceSocket(): { activeWorkstreamIds: Ref<string[]> } {
 
   socket.onopen = () => {
     if (!mounted) return
-    socket.send(JSON.stringify({ type: 'presence:subscribe' }))
+    socket.send(JSON.stringify({ type: 'workstreams:subscribe' }))
   }
 
   socket.onmessage = (ev) => {
@@ -97,6 +100,8 @@ export function usePresenceSocket(): { activeWorkstreamIds: Ref<string[]> } {
         } else {
           activeWorkstreamIds.value = activeWorkstreamIds.value.filter(id => id !== workstreamId)
         }
+      } else if (msg.type === 'workstream:updated') {
+        handlers?.onWorkstreamUpdated?.(msg.data as Workstream)
       }
     } catch {
       // ignore malformed frames

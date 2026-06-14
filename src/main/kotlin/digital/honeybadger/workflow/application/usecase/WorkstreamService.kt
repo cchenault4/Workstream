@@ -24,7 +24,7 @@ class WorkstreamService(
         require(request.requester.isNotBlank()) { "requester must not be blank" }
         // Capture now() once so createdAt and updatedAt are guaranteed equal on creation.
         val now = clock.now()
-        return repository.save(
+        val workstream = repository.save(
             Workstream(
                 id = UUID.randomUUID().toString(),
                 title = request.title,
@@ -36,6 +36,8 @@ class WorkstreamService(
                 updatedAt = now
             )
         )
+        publisher.publishWorkstreamUpdate(workstream)
+        return workstream
     }
 
     override fun list(): List<Workstream> = repository.findAll()

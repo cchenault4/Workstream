@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory
  * Messages with a blank workstreamId are silently ignored.
  * All joined rooms are cleaned up automatically when the session closes.
  */
-private const val PRESENCE_ROOM = "__presence__"
+private const val WORKSTREAMS_ROOM = "__workstreams__"
 private val log = LoggerFactory.getLogger("WebSocketRoutes")
 
 fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, scope: CoroutineScope) {
@@ -39,10 +39,10 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, sco
                     log.info("[{}] received type={} workstreamId={}", sessionId, msg.type, msg.workstreamId.ifBlank { "(none)" })
 
                     when (msg.type) {
-                        "presence:subscribe" -> {
-                            registry.join(PRESENCE_ROOM, this)
-                            joinedRooms.add(PRESENCE_ROOM)
-                            log.info("[{}] joined presence room; presenceRoom size={}", sessionId, registry.roomSize(PRESENCE_ROOM))
+                        "workstreams:subscribe" -> {
+                            registry.join(WORKSTREAMS_ROOM, this)
+                            joinedRooms.add(WORKSTREAMS_ROOM)
+                            log.info("[{}] joined presence room; presenceRoom size={}", sessionId, registry.roomSize(WORKSTREAMS_ROOM))
                             val active = registry.activeRooms()
                             log.info("[{}] catching up: active rooms={}", sessionId, active)
                             active.forEach { wid ->
@@ -53,10 +53,10 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, sco
                             if (msg.workstreamId.isBlank()) continue
                             registry.join(msg.workstreamId, this)
                             joinedRooms.add(msg.workstreamId)
-                            log.info("[{}] joined workstream={}; presenceRoom size={}", sessionId, msg.workstreamId, registry.roomSize(PRESENCE_ROOM))
+                            log.info("[{}] joined workstream={}; presenceRoom size={}", sessionId, msg.workstreamId, registry.roomSize(WORKSTREAMS_ROOM))
                             scope.launch {
-                                log.info("[{}] broadcasting presence active to presenceRoom (size={})", sessionId, registry.roomSize(PRESENCE_ROOM))
-                                registry.broadcast(PRESENCE_ROOM, presenceMessage(msg.workstreamId, true))
+                                log.info("[{}] broadcasting presence active to presenceRoom (size={})", sessionId, registry.roomSize(WORKSTREAMS_ROOM))
+                                registry.broadcast(WORKSTREAMS_ROOM, presenceMessage(msg.workstreamId, true))
                             }
                         }
                         "workstream:leave" -> {
@@ -65,7 +65,7 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, sco
                             joinedRooms.remove(msg.workstreamId)
                             val active = registry.roomSize(msg.workstreamId) > 0
                             log.info("[{}] left workstream={}; still active={}", sessionId, msg.workstreamId, active)
-                            scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(msg.workstreamId, active)) }
+                            scope.launch { registry.broadcast(WORKSTREAMS_ROOM, presenceMessage(msg.workstreamId, active)) }
                         }
                     }
                 }
@@ -73,10 +73,10 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, sco
                 log.info("[{}] disconnected; cleaning up rooms={}", sessionId, joinedRooms)
                 joinedRooms.forEach { wid ->
                     registry.leave(wid, this)
-                    if (wid != PRESENCE_ROOM) {
+                    if (wid != WORKSTREAMS_ROOM) {
                         val active = registry.roomSize(wid) > 0
                         log.info("[{}] disconnect cleanup: workstream={} still active={}", sessionId, wid, active)
-                        scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(wid, active)) }
+                        scope.launch { registry.broadcast(WORKSTREAMS_ROOM, presenceMessage(wid, active)) }
                     }
                 }
             }
