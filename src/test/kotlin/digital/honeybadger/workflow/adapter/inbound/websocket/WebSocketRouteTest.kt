@@ -4,6 +4,8 @@ import io.ktor.client.plugins.websocket.*
 import io.ktor.server.testing.*
 import io.ktor.websocket.*
 import digital.honeybadger.workflow.configurePlugins
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +17,7 @@ class WebSocketRouteTest {
         val registry = DefaultWebSocketSessionRegistry()
         application {
             configurePlugins()
-            configureWebSocketRoutes(registry)
+            configureWebSocketRoutes(registry, CoroutineScope(Dispatchers.Default))
         }
         val client = createClient { install(WebSockets) }
         client.webSocket("/ws") {
@@ -28,7 +30,7 @@ class WebSocketRouteTest {
         val registry = DefaultWebSocketSessionRegistry()
         application {
             configurePlugins()
-            configureWebSocketRoutes(registry)
+            configureWebSocketRoutes(registry, CoroutineScope(Dispatchers.Default))
         }
         val client = createClient { install(WebSockets) }
         client.webSocket("/ws") {
@@ -43,7 +45,7 @@ class WebSocketRouteTest {
         val registry = DefaultWebSocketSessionRegistry()
         application {
             configurePlugins()
-            configureWebSocketRoutes(registry)
+            configureWebSocketRoutes(registry, CoroutineScope(Dispatchers.Default))
         }
         val client = createClient { install(WebSockets) }
         client.webSocket("/ws") {

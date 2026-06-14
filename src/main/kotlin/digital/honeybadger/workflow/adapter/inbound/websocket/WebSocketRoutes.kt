@@ -5,6 +5,8 @@ import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Registers the WebSocket endpoint at /ws.
@@ -17,7 +19,7 @@ import io.ktor.websocket.*
  * Messages with a blank workstreamId are silently ignored.
  * All joined rooms are cleaned up automatically when the session closes.
  */
-fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry) {
+fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, scope: CoroutineScope) {
     routing {
         webSocket("/ws") {
             registry.track(this)
@@ -38,12 +40,12 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry) {
                         "workstream:join" -> {
                             registry.join(msg.workstreamId, this)
                             joinedRooms.add(msg.workstreamId)
-                            registry.broadcastAll(presenceMessage(msg.workstreamId, true))
+                            scope.launch { registry.broadcastAll(presenceMessage(msg.workstreamId, true)) }
                         }
                         "workstream:leave" -> {
                             registry.leave(msg.workstreamId, this)
                             joinedRooms.remove(msg.workstreamId)
-                            registry.broadcastAll(presenceMessage(msg.workstreamId, registry.roomSize(msg.workstreamId) > 0))
+                            scope.launch { registry.broadcastAll(presenceMessage(msg.workstreamId, registry.roomSize(msg.workstreamId) > 0)) }
                         }
                     }
                 }
@@ -52,7 +54,9 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry) {
                 registry.untrack(this)
                 joinedRooms.forEach { wid ->
                     registry.leave(wid, this)
-                    registry.broadcastAll(presenceMessage(wid, registry.roomSize(wid) > 0))
+                    // Use application scope: the session coroutine may be cancelling,
+                    // and suspend calls in a cancelled context throw immediately.
+                    scope.launch { registry.broadcastAll(presenceMessage(wid, registry.roomSize(wid) > 0)) }
                 }
             }
         }
