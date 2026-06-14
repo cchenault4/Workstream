@@ -22,6 +22,8 @@ interface WebSocketSessionRegistry {
     fun leave(workstreamId: String, session: DefaultWebSocketSession)
     /** Number of sessions currently in [workstreamId]'s room. */
     fun roomSize(workstreamId: String): Int
+    /** All workstream IDs that currently have at least one active session. */
+    fun activeRooms(): Set<String>
     /** Broadcast [message] to every tracked session (across all rooms). */
     suspend fun broadcastAll(message: String)
     suspend fun broadcast(workstreamId: String, message: String)
@@ -50,6 +52,9 @@ class DefaultWebSocketSessionRegistry : WebSocketSessionRegistry {
     }
 
     override fun roomSize(workstreamId: String): Int = rooms[workstreamId]?.size ?: 0
+
+    override fun activeRooms(): Set<String> =
+        rooms.entries.filter { it.value.isNotEmpty() }.map { it.key }.toSet()
 
     override suspend fun broadcastAll(message: String) {
         val dead = mutableSetOf<DefaultWebSocketSession>()

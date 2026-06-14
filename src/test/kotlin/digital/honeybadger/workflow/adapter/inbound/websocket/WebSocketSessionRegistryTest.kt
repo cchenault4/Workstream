@@ -128,6 +128,19 @@ class WebSocketSessionRegistryTest {
     }
 
     @Test
+    fun `activeRooms returns only rooms with at least one session`() = runTest {
+        val s1 = mockSession()
+        val s2 = mockSession()
+        registry.join("ws-1", s1)
+        registry.join("ws-2", s2)
+        registry.leave("ws-2", s2)
+
+        val active = registry.activeRooms()
+        assert("ws-1" in active)
+        assert("ws-2" !in active)
+    }
+
+    @Test
     fun `dead session is evicted after a failed send and skipped on subsequent broadcasts`() = runTest {
         val dead = mockk<DefaultWebSocketSession>()
         val alive = mockSession()

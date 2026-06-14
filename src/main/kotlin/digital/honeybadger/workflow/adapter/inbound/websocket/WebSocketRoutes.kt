@@ -21,6 +21,9 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry) {
     routing {
         webSocket("/ws") {
             registry.track(this)
+            // Catch up the new client on current presence state so it doesn't miss joins
+            // that happened before it connected.
+            registry.activeRooms().forEach { wid -> send(Frame.Text(presenceMessage(wid, true))) }
             val joinedRooms = mutableSetOf<String>()
             try {
                 for (frame in incoming) {
