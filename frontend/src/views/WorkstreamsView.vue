@@ -4,6 +4,7 @@ import { workstreamsApi } from '../api/workstreams'
 import { usePresenceSocket } from '../composables/useWorkstreamSocket'
 import { PRIORITY_CLASS, STATUS_CLASS } from '../utils/badges'
 import { formatDate } from '../utils/format'
+import Badge from '../components/Badge.vue'
 import type { CreateWorkstreamRequest, Workstream } from '../types/workstream'
 
 const workstreams = ref<Workstream[]>([])
@@ -129,11 +130,11 @@ onMounted(load)
         <tr v-for="ws in workstreams" :key="ws.id" class="clickable" @click="$router.push(`/workstreams/${ws.id}`)">
           <td class="cell-title">{{ ws.title }}</td>
           <td class="cell-presence">
-            <span v-if="activeWorkstreamIds.includes(ws.id)" class="badge badge-active">● Active</span>
+            <Badge v-if="activeWorkstreamIds.includes(ws.id)" variant="badge-active" label="● Active" />
           </td>
           <td>{{ ws.requester }}</td>
-          <td><span class="badge" :class="PRIORITY_CLASS[ws.priority]">{{ ws.priority }}</span></td>
-          <td><span class="badge" :class="STATUS_CLASS[ws.status]">{{ ws.status }}</span></td>
+          <td><Badge :variant="PRIORITY_CLASS[ws.priority]" :label="ws.priority" /></td>
+          <td><Badge :variant="STATUS_CLASS[ws.status]" :label="ws.status" /></td>
           <td class="cell-date">{{ formatDate(ws.createdAt) }}</td>
         </tr>
       </tbody>

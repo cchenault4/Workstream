@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { workstreamsApi } from '../api/workstreams'
 import { useWorkstreamSocket } from '../composables/useWorkstreamSocket'
 import { ACTIVITY_CLASS, PHASE_CLASS, PRIORITY_CLASS, QUESTION_TYPE_CLASS, STATUS_CLASS } from '../utils/badges'
+import Badge from '../components/Badge.vue'
 import { formatDate, formatDateTime } from '../utils/format'
 import type {
   ActivityEvent,
@@ -471,7 +472,7 @@ const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
             <h3>Open Questions</h3>
             <div class="questions-list">
               <div v-for="q in plan.openQuestions" :key="q.id" class="question-item">
-                <span class="badge" :class="QUESTION_TYPE_CLASS[q.type]">{{ q.type }}</span>
+                <Badge :variant="QUESTION_TYPE_CLASS[q.type]" :label="q.type" />
                 <div class="question-body">
                   <span class="question-text">{{ q.question }}</span>
                   <span v-if="q.resolution" class="question-resolution">→ {{ q.resolution }}</span>
@@ -485,7 +486,7 @@ const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
             <h3>Phases</h3>
             <div class="phases-list">
               <div v-for="phase in plan.phases" :key="phase.id" class="phase-item">
-                <span class="badge" :class="PHASE_CLASS[phase.status]">{{ phase.status }}</span>
+                <Badge :variant="PHASE_CLASS[phase.status]" :label="phase.status" />
                 <span class="phase-name-text"><strong>{{ phase.name }}</strong> — {{ phase.objective }}</span>
               </div>
             </div>
@@ -577,7 +578,7 @@ const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
         <!-- Activity feed -->
         <div v-if="activities.length > 0" class="activity-feed">
           <div v-for="event in activities" :key="event.id" class="activity-item">
-            <span class="badge" :class="ACTIVITY_CLASS[event.type]">{{ event.type.replace('_', ' ') }}</span>
+            <Badge :variant="ACTIVITY_CLASS[event.type]" :label="event.type.replace('_', ' ')" />
             <div class="activity-body">
               <span class="activity-agent">{{ event.agentName }}</span>
               <span class="activity-message">{{ event.message }}</span>
