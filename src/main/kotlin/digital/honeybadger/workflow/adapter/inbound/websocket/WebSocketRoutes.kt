@@ -7,6 +7,7 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 
 /**
  * Registers the WebSocket endpoint at /ws.
@@ -20,10 +21,13 @@ import kotlinx.coroutines.launch
  * All joined rooms are cleaned up automatically when the session closes.
  */
 private const val PRESENCE_ROOM = "__presence__"
+private val log = LoggerFactory.getLogger("WebSocketRoutes")
 
 fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, scope: CoroutineScope) {
     routing {
         webSocket("/ws") {
+            val sessionId = System.identityHashCode(this).toString(16)
+            log.info("[{}] connected", sessionId)
             val joinedRooms = mutableSetOf<String>()
             try {
                 for (frame in incoming) {
@@ -32,13 +36,16 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, sco
                         appJson.decodeFromString<WsClientMessage>(frame.readText())
                     }.getOrNull() ?: continue
 
+                    log.info("[{}] received type={} workstreamId={}", sessionId, msg.type, msg.workstreamId.ifBlank { "(none)" })
+
                     when (msg.type) {
-                        // List-page clients subscribe to presence updates for all workstreams.
                         "presence:subscribe" -> {
                             registry.join(PRESENCE_ROOM, this)
                             joinedRooms.add(PRESENCE_ROOM)
-                            // Catch up: send current active state for workstreams already being viewed.
-                            registry.activeRooms().forEach { wid ->
+                            log.info("[{}] joined presence room; presenceRoom size={}", sessionId, registry.roomSize(PRESENCE_ROOM))
+                            val active = registry.activeRooms()
+                            log.info("[{}] catching up: active rooms={}", sessionId, active)
+                            active.forEach { wid ->
                                 send(Frame.Text(presenceMessage(wid, true)))
                             }
                         }
@@ -46,22 +53,30 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, sco
                             if (msg.workstreamId.isBlank()) continue
                             registry.join(msg.workstreamId, this)
                             joinedRooms.add(msg.workstreamId)
-                            scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(msg.workstreamId, true)) }
+                            log.info("[{}] joined workstream={}; presenceRoom size={}", sessionId, msg.workstreamId, registry.roomSize(PRESENCE_ROOM))
+                            scope.launch {
+                                log.info("[{}] broadcasting presence active to presenceRoom (size={})", sessionId, registry.roomSize(PRESENCE_ROOM))
+                                registry.broadcast(PRESENCE_ROOM, presenceMessage(msg.workstreamId, true))
+                            }
                         }
                         "workstream:leave" -> {
                             if (msg.workstreamId.isBlank()) continue
                             registry.leave(msg.workstreamId, this)
                             joinedRooms.remove(msg.workstreamId)
-                            scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(msg.workstreamId, registry.roomSize(msg.workstreamId) > 0)) }
+                            val active = registry.roomSize(msg.workstreamId) > 0
+                            log.info("[{}] left workstream={}; still active={}", sessionId, msg.workstreamId, active)
+                            scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(msg.workstreamId, active)) }
                         }
                     }
                 }
             } finally {
-                // Clean up all joined rooms; broadcast presence change for any workstream rooms.
+                log.info("[{}] disconnected; cleaning up rooms={}", sessionId, joinedRooms)
                 joinedRooms.forEach { wid ->
                     registry.leave(wid, this)
                     if (wid != PRESENCE_ROOM) {
-                        scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(wid, registry.roomSize(wid) > 0)) }
+                        val active = registry.roomSize(wid) > 0
+                        log.info("[{}] disconnect cleanup: workstream={} still active={}", sessionId, wid, active)
+                        scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(wid, active)) }
                     }
                 }
             }

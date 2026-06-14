@@ -1,6 +1,7 @@
 package digital.honeybadger.workflow.adapter.inbound.websocket
 
 import io.ktor.websocket.*
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -29,6 +30,8 @@ interface WebSocketSessionRegistry {
  */
 class DefaultWebSocketSessionRegistry : WebSocketSessionRegistry {
 
+    private val log = LoggerFactory.getLogger(DefaultWebSocketSessionRegistry::class.java)
+
     // ConcurrentHashMap.newKeySet() gives a thread-safe Set backed by a CHM, preserving
     // set semantics (no duplicates) without explicit locking.
     private val rooms = ConcurrentHashMap<String, MutableSet<DefaultWebSocketSession>>()
@@ -50,10 +53,16 @@ class DefaultWebSocketSessionRegistry : WebSocketSessionRegistry {
             .toSet()
 
     override suspend fun broadcast(workstreamId: String, message: String) {
-        val sessions = rooms[workstreamId] ?: return
+        val sessions = rooms[workstreamId]
+        log.info("broadcast room={} sessionCount={} message={}", workstreamId, sessions?.size ?: 0, message)
+        if (sessions == null) return
         val dead = mutableSetOf<DefaultWebSocketSession>()
         sessions.forEach { session ->
-            if (runCatching { session.send(Frame.Text(message)) }.isFailure) dead.add(session)
+            val result = runCatching { session.send(Frame.Text(message)) }
+            if (result.isFailure) {
+                log.warn("broadcast room={} send failed: {}", workstreamId, result.exceptionOrNull()?.message)
+                dead.add(session)
+            }
         }
         // Evict dead sessions so subsequent broadcasts skip them without retrying.
         sessions.removeAll(dead)
