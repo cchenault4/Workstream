@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { workstreamsApi } from '../api/workstreams'
-import { makeWsSocket } from '../composables/useWorkstreamSocket'
+import { usePresenceSocket } from '../composables/useWorkstreamSocket'
 import { PRIORITY_CLASS, STATUS_CLASS } from '../utils/badges'
 import { formatDate } from '../utils/format'
 import type { CreateWorkstreamRequest, Workstream } from '../types/workstream'
@@ -9,7 +9,7 @@ import type { CreateWorkstreamRequest, Workstream } from '../types/workstream'
 const workstreams = ref<Workstream[]>([])
 const loading = ref(true)
 const loadError = ref<string | null>(null)
-const activeWorkstreamIds = ref<string[]>([])
+const { activeWorkstreamIds } = usePresenceSocket()
 
 const showForm = ref(false)
 const submitting = ref(false)
@@ -54,38 +54,7 @@ function cancelForm() {
   form.value = { title: '', description: '', requester: '', priority: 'MEDIUM' }
 }
 
-let presenceSocket: WebSocket | null = null
-let presenceMounted = false
-
-onMounted(() => {
-  presenceMounted = true
-  load()
-  presenceSocket = makeWsSocket()
-  presenceSocket.onopen = () => {
-    if (!presenceMounted) return
-    presenceSocket!.send(JSON.stringify({ type: 'presence:subscribe' }))
-  }
-  presenceSocket.onmessage = (ev) => {
-    try {
-      const msg = JSON.parse(ev.data as string)
-      if (msg.type === 'workstream:presence') {
-        const { workstreamId, active } = msg.data as { workstreamId: string; active: boolean }
-        if (active) {
-          if (!activeWorkstreamIds.value.includes(workstreamId)) {
-            activeWorkstreamIds.value = [...activeWorkstreamIds.value, workstreamId]
-          }
-        } else {
-          activeWorkstreamIds.value = activeWorkstreamIds.value.filter(id => id !== workstreamId)
-        }
-      }
-    } catch { /* ignore malformed frames */ }
-  }
-})
-
-onUnmounted(() => {
-  presenceMounted = false
-  presenceSocket?.close()
-})
+onMounted(load)
 </script>
 
 <template>

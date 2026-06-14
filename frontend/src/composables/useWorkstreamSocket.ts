@@ -1,4 +1,5 @@
 import { onUnmounted, ref } from 'vue'
+import type { Ref } from 'vue'
 import type { ActivityEvent, Plan, Workstream } from '../types/workstream'
 
 interface WsMessage {
@@ -64,4 +65,48 @@ export function useWorkstreamSocket(workstreamId: string, handlers: Handlers) {
   })
 
   return { connected }
+}
+
+/**
+ * Subscribes to workstream presence updates for all workstreams.
+ * Connects to /ws, sends presence:subscribe, and maintains the list of
+ * workstream IDs that currently have at least one active viewer.
+ * Closes the connection on unmount.
+ */
+export function usePresenceSocket(): { activeWorkstreamIds: Ref<string[]> } {
+  const activeWorkstreamIds = ref<string[]>([])
+  let mounted = true
+
+  const socket = makeWsSocket()
+
+  socket.onopen = () => {
+    if (!mounted) return
+    socket.send(JSON.stringify({ type: 'presence:subscribe' }))
+  }
+
+  socket.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data as string) as WsMessage
+      if (typeof msg.type !== 'string' || typeof msg.data !== 'object' || msg.data === null) return
+      if (msg.type === 'workstream:presence') {
+        const { workstreamId, active } = msg.data as { workstreamId: string; active: boolean }
+        if (active) {
+          if (!activeWorkstreamIds.value.includes(workstreamId)) {
+            activeWorkstreamIds.value = [...activeWorkstreamIds.value, workstreamId]
+          }
+        } else {
+          activeWorkstreamIds.value = activeWorkstreamIds.value.filter(id => id !== workstreamId)
+        }
+      }
+    } catch {
+      // ignore malformed frames
+    }
+  }
+
+  onUnmounted(() => {
+    mounted = false
+    socket.close()
+  })
+
+  return { activeWorkstreamIds }
 }
