@@ -243,7 +243,7 @@ onMounted(async () => {
 })
 
 // ── Real-time ─────────────────────────────────────────────────────────────────
-const { connected } = useWorkstreamSocket(id, {
+useWorkstreamSocket(id, {
   onActivity: (event) => {
     // Dedup: the user's own POST already adds the event immediately.
     if (!activities.value.some(a => a.id === event.id)) {
