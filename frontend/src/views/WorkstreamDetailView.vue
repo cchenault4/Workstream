@@ -5,6 +5,8 @@ import { workstreamsApi } from '../api/workstreams'
 import { useWorkstreamSocket } from '../composables/useWorkstreamSocket'
 import { ACTIVITY_CLASS, PHASE_CLASS, PRIORITY_CLASS, QUESTION_TYPE_CLASS, STATUS_CLASS } from '../utils/badges'
 import Badge from '../components/Badge.vue'
+import StringListField from '../components/StringListField.vue'
+import StringList from '../components/StringList.vue'
 import { formatDate, formatDateTime } from '../utils/format'
 import type {
   ActivityEvent,
@@ -111,22 +113,6 @@ function openPlanForm() {
   showPlanForm.value = true
 }
 
-function addNonGoal() {
-  planForm.value.nonGoals.push('')
-}
-
-function removeNonGoal(index: number) {
-  planForm.value.nonGoals.splice(index, 1)
-}
-
-function addAssumption() {
-  planForm.value.assumptions.push('')
-}
-
-function removeAssumption(index: number) {
-  planForm.value.assumptions.splice(index, 1)
-}
-
 function addQuestion() {
   planForm.value.openQuestions.push({
     id: Math.random().toString(36).slice(2, 10),
@@ -138,14 +124,6 @@ function addQuestion() {
 
 function removeQuestion(index: number) {
   planForm.value.openQuestions.splice(index, 1)
-}
-
-function addVerificationStep() {
-  planForm.value.verificationPlan.push('')
-}
-
-function removeVerificationStep(index: number) {
-  planForm.value.verificationPlan.splice(index, 1)
 }
 
 function addPhase() {
@@ -351,25 +329,19 @@ const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
             <input v-model="planForm.goal" required placeholder="What are we trying to achieve?" />
           </div>
 
-          <div class="field">
-            <label>Non-Goals</label>
-            <div v-if="planForm.nonGoals.length === 0" class="muted small">No non-goals yet.</div>
-            <div v-for="(_, i) in planForm.nonGoals" :key="i" class="assumption-row">
-              <input v-model="planForm.nonGoals[i]" required placeholder="e.g. We are not supporting SSO" />
-              <button type="button" class="btn-remove" @click="removeNonGoal(i)">✕</button>
-            </div>
-            <button type="button" class="btn-add-phase" @click="addNonGoal">+ Add Non-Goal</button>
-          </div>
+          <StringListField
+            v-model="planForm.nonGoals"
+            label="Non-Goals"
+            placeholder="e.g. We are not supporting SSO"
+            add-label="+ Add Non-Goal"
+          />
 
-          <div class="field">
-            <label>Assumptions</label>
-            <div v-if="planForm.assumptions.length === 0" class="muted small">No assumptions yet.</div>
-            <div v-for="(_, i) in planForm.assumptions" :key="i" class="assumption-row">
-              <input v-model="planForm.assumptions[i]" required placeholder="e.g. Postgres is available" />
-              <button type="button" class="btn-remove" @click="removeAssumption(i)">✕</button>
-            </div>
-            <button type="button" class="btn-add-phase" @click="addAssumption">+ Add Assumption</button>
-          </div>
+          <StringListField
+            v-model="planForm.assumptions"
+            label="Assumptions"
+            placeholder="e.g. Postgres is available"
+            add-label="+ Add Assumption"
+          />
 
           <div class="field">
             <label>Open Questions</label>
@@ -427,15 +399,12 @@ const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
             <button type="button" class="btn-add-phase" @click="addPhase">+ Add Phase</button>
           </div>
 
-          <div class="field">
-            <label>Verification Plan</label>
-            <div v-if="planForm.verificationPlan.length === 0" class="muted small">No verification steps yet.</div>
-            <div v-for="(_, i) in planForm.verificationPlan" :key="i" class="assumption-row">
-              <input v-model="planForm.verificationPlan[i]" required placeholder="e.g. Run integration tests against staging" />
-              <button type="button" class="btn-remove" @click="removeVerificationStep(i)">✕</button>
-            </div>
-            <button type="button" class="btn-add-phase" @click="addVerificationStep">+ Add Step</button>
-          </div>
+          <StringListField
+            v-model="planForm.verificationPlan"
+            label="Verification Plan"
+            placeholder="e.g. Run integration tests against staging"
+            add-label="+ Add Step"
+          />
 
           <p v-if="planFormError" class="error">{{ planFormError }}</p>
 
@@ -454,19 +423,8 @@ const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
             <p class="plan-goal">{{ plan.goal }}</p>
           </div>
 
-          <div v-if="plan.nonGoals.length > 0" class="plan-subsection">
-            <h3>Non-Goals</h3>
-            <ul class="assumptions-list">
-              <li v-for="(ng, i) in plan.nonGoals" :key="i">{{ ng }}</li>
-            </ul>
-          </div>
-
-          <div v-if="plan.assumptions.length > 0" class="plan-subsection">
-            <h3>Assumptions</h3>
-            <ul class="assumptions-list">
-              <li v-for="(a, i) in plan.assumptions" :key="i">{{ a }}</li>
-            </ul>
-          </div>
+          <StringList heading="Non-Goals" :items="plan.nonGoals" />
+          <StringList heading="Assumptions" :items="plan.assumptions" />
 
           <div v-if="plan.openQuestions.length > 0" class="plan-subsection">
             <h3>Open Questions</h3>
@@ -492,12 +450,7 @@ const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
             </div>
           </div>
 
-          <div v-if="plan.verificationPlan.length > 0" class="plan-subsection">
-            <h3>Verification Plan</h3>
-            <ul class="assumptions-list">
-              <li v-for="(step, i) in plan.verificationPlan" :key="i">{{ step }}</li>
-            </ul>
-          </div>
+          <StringList heading="Verification Plan" :items="plan.verificationPlan" />
 
           <!-- Readiness -->
           <div v-if="readiness" class="readiness">
@@ -721,28 +674,6 @@ h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spac
 
 .form-card { background: #f9fafb; }
 
-/* Assumptions form row */
-.assumption-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.4rem;
-}
-
-.assumption-row input { flex: 1; }
-
-/* Plan sub-sections (assumptions, etc.) */
-.plan-subsection { display: flex; flex-direction: column; gap: 0.4rem; }
-
-.assumptions-list {
-  margin: 0;
-  padding-left: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  color: #374151;
-}
 
 /* Open questions display */
 .questions-list {
