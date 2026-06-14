@@ -42,6 +42,18 @@ async function updateStatus(status: WorkstreamStatus) {
   }
 }
 
+const prioritySaving = ref(false)
+
+async function updatePriority(priority: Priority) {
+  if (!workstream.value) return
+  prioritySaving.value = true
+  try {
+    workstream.value = await workstreamsApi.update(id, { priority })
+  } finally {
+    prioritySaving.value = false
+  }
+}
+
 // ── Edit workstream (in-place) ────────────────────────────────────────────────
 const editing     = ref(false)
 const editSaving  = ref(false)
@@ -70,11 +82,6 @@ async function saveEdit() {
   } finally {
     editSaving.value = false
   }
-}
-
-async function updatePriority(priority: Priority) {
-  if (!workstream.value) return
-  workstream.value = await workstreamsApi.update(id, { priority })
 }
 
 // ── Plan form ─────────────────────────────────────────────────────────────────
@@ -161,10 +168,10 @@ async function savePlan() {
     planSaving.value = false
     return
   }
-  // Plan saved — close form before awaiting readiness so the UI unblocks immediately.
+  // Plan saved — close form. Readiness is refreshed by the plan:updated WS broadcast,
+  // which fires for both local saves and external updates from other agents.
   planSaving.value = false
   showPlanForm.value = false
-  readiness.value = await workstreamsApi.getReadiness(id).catch(() => null)
 }
 
 // ── Activity form ─────────────────────────────────────────────────────────────
@@ -177,24 +184,37 @@ const activityForm = ref<CreateActivityEventRequest>({
   message: '',
 })
 
+function toggleActivityForm() {
+  if (showActivityForm.value) {
+    showActivityForm.value = false
+    activityFormError.value = null
+    activityForm.value = { agentName: '', type: 'PLANNING', message: '' }
+  } else {
+    showActivityForm.value = true
+  }
+}
+
 async function addActivity() {
   activitySaving.value = true
   activityFormError.value = null
+  let savedEvent: ActivityEvent | null = null
   try {
-    const event = await workstreamsApi.addActivity(id, activityForm.value)
-    if (!activities.value.some(a => a.id === event.id)) {
-      activities.value.unshift(event)
+    savedEvent = await workstreamsApi.addActivity(id, activityForm.value)
+    if (!activities.value.some(a => a.id === savedEvent!.id)) {
+      activities.value.unshift(savedEvent)
     }
   } catch (e) {
     activityFormError.value = e instanceof Error ? e.message : 'Failed to add event'
     activitySaving.value = false
     return
   }
-  // Event saved — reset form and close before refreshing readiness.
   activitySaving.value = false
   activityForm.value = { agentName: '', type: 'PLANNING', message: '' }
   showActivityForm.value = false
-  if (plan.value) readiness.value = await workstreamsApi.getReadiness(id).catch(() => null)
+  // Only VERIFICATION and REVIEW events can change readiness gates.
+  if (plan.value && (savedEvent!.type === 'VERIFICATION' || savedEvent!.type === 'REVIEW')) {
+    readiness.value = await workstreamsApi.getReadiness(id).catch(() => null)
+  }
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
@@ -320,6 +340,7 @@ function formatDateTime(iso: string): string {
             class="status-select"
             :class="PRIORITY_CLASS[workstream.priority]"
             :value="workstream.priority"
+            :disabled="prioritySaving"
             @change="updatePriority(($event.target as HTMLSelectElement).value as Priority)"
           >
             <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
@@ -546,7 +567,7 @@ function formatDateTime(iso: string): string {
       <section>
         <div class="section-header">
           <h2>Activity</h2>
-          <button class="btn-secondary" @click="showActivityForm = !showActivityForm">
+          <button class="btn-secondary" @click="toggleActivityForm">
             {{ showActivityForm ? 'Cancel' : '+ Add Event' }}
           </button>
         </div>

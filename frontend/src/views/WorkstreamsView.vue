@@ -71,12 +71,15 @@ const STATUS_CLASS: Record<Workstream['status'], string> = {
 }
 
 let presenceSocket: WebSocket | null = null
+let presenceMounted = false
 
 onMounted(() => {
+  presenceMounted = true
   load()
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   presenceSocket = new WebSocket(`${protocol}//${window.location.host}/ws`)
   presenceSocket.onopen = () => {
+    if (!presenceMounted) return
     presenceSocket!.send(JSON.stringify({ type: 'presence:subscribe' }))
   }
   presenceSocket.onmessage = (ev) => {
@@ -97,6 +100,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  presenceMounted = false
   presenceSocket?.close()
 })
 </script>

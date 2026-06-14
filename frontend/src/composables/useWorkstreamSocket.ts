@@ -31,6 +31,7 @@ export function useWorkstreamSocket(workstreamId: string, handlers: Handlers) {
   socket.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data as string) as WsMessage
+      if (typeof msg.type !== 'string' || typeof msg.data !== 'object' || msg.data === null) return
       switch (msg.type) {
         case 'activity:created':
           handlers.onActivity?.(msg.data as ActivityEvent)
