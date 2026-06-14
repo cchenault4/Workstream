@@ -19,13 +19,11 @@ import kotlinx.coroutines.launch
  * Messages with a blank workstreamId are silently ignored.
  * All joined rooms are cleaned up automatically when the session closes.
  */
+private const val PRESENCE_ROOM = "__presence__"
+
 fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, scope: CoroutineScope) {
     routing {
         webSocket("/ws") {
-            registry.track(this)
-            // Catch up the new client on current presence state so it doesn't miss joins
-            // that happened before it connected.
-            registry.activeRooms().forEach { wid -> send(Frame.Text(presenceMessage(wid, true))) }
             val joinedRooms = mutableSetOf<String>()
             try {
                 for (frame in incoming) {
@@ -34,29 +32,37 @@ fun Application.configureWebSocketRoutes(registry: WebSocketSessionRegistry, sco
                         appJson.decodeFromString<WsClientMessage>(frame.readText())
                     }.getOrNull() ?: continue
 
-                    if (msg.workstreamId.isBlank()) continue
-
                     when (msg.type) {
+                        // List-page clients subscribe to presence updates for all workstreams.
+                        "presence:subscribe" -> {
+                            registry.join(PRESENCE_ROOM, this)
+                            joinedRooms.add(PRESENCE_ROOM)
+                            // Catch up: send current active state for workstreams already being viewed.
+                            registry.activeRooms().forEach { wid ->
+                                send(Frame.Text(presenceMessage(wid, true)))
+                            }
+                        }
                         "workstream:join" -> {
+                            if (msg.workstreamId.isBlank()) continue
                             registry.join(msg.workstreamId, this)
                             joinedRooms.add(msg.workstreamId)
-                            scope.launch { registry.broadcastAll(presenceMessage(msg.workstreamId, true)) }
+                            scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(msg.workstreamId, true)) }
                         }
                         "workstream:leave" -> {
+                            if (msg.workstreamId.isBlank()) continue
                             registry.leave(msg.workstreamId, this)
                             joinedRooms.remove(msg.workstreamId)
-                            scope.launch { registry.broadcastAll(presenceMessage(msg.workstreamId, registry.roomSize(msg.workstreamId) > 0)) }
+                            scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(msg.workstreamId, registry.roomSize(msg.workstreamId) > 0)) }
                         }
                     }
                 }
             } finally {
-                // Untrack before broadcasting so the closed session isn't a delivery target.
-                registry.untrack(this)
+                // Clean up all joined rooms; broadcast presence change for any workstream rooms.
                 joinedRooms.forEach { wid ->
                     registry.leave(wid, this)
-                    // Use application scope: the session coroutine may be cancelling,
-                    // and suspend calls in a cancelled context throw immediately.
-                    scope.launch { registry.broadcastAll(presenceMessage(wid, registry.roomSize(wid) > 0)) }
+                    if (wid != PRESENCE_ROOM) {
+                        scope.launch { registry.broadcast(PRESENCE_ROOM, presenceMessage(wid, registry.roomSize(wid) > 0)) }
+                    }
                 }
             }
         }

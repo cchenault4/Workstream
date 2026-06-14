@@ -69,47 +69,6 @@ class WebSocketSessionRegistryTest {
     }
 
     @Test
-    fun `broadcastAll delivers message to all tracked sessions`() = runTest {
-        val s1 = mockSession()
-        val s2 = mockSession()
-        registry.track(s1)
-        registry.track(s2)
-
-        registry.broadcastAll("hello")
-
-        coVerify { s1.send(match { it is Frame.Text && it.readText() == "hello" }) }
-        coVerify { s2.send(match { it is Frame.Text && it.readText() == "hello" }) }
-    }
-
-    @Test
-    fun `broadcastAll skips untracked sessions`() = runTest {
-        val tracked = mockSession()
-        val untracked = mockSession()
-        registry.track(tracked)
-        // untracked is never registered
-
-        registry.broadcastAll("hello")
-
-        coVerify(exactly = 1) { tracked.send(any<Frame>()) }
-        coVerify(exactly = 0) { untracked.send(any<Frame>()) }
-    }
-
-    @Test
-    fun `broadcastAll evicts dead sessions`() = runTest {
-        val dead = mockk<DefaultWebSocketSession>()
-        val alive = mockSession()
-        coEvery { dead.send(any<Frame>()) } throws Exception("closed")
-        registry.track(dead)
-        registry.track(alive)
-
-        registry.broadcastAll("first")   // dead fails and is evicted
-        registry.broadcastAll("second")  // only alive receives this
-
-        coVerify(exactly = 2) { alive.send(any<Frame>()) }
-        coVerify(exactly = 1) { dead.send(any<Frame>()) }
-    }
-
-    @Test
     fun `roomSize reflects join and leave`() = runTest {
         val s1 = mockSession()
         val s2 = mockSession()
@@ -128,16 +87,19 @@ class WebSocketSessionRegistryTest {
     }
 
     @Test
-    fun `activeRooms returns only rooms with at least one session`() = runTest {
+    fun `activeRooms returns only non-internal rooms with at least one session`() = runTest {
         val s1 = mockSession()
         val s2 = mockSession()
+        val s3 = mockSession()
         registry.join("ws-1", s1)
         registry.join("ws-2", s2)
+        registry.join("__presence__", s3)
         registry.leave("ws-2", s2)
 
         val active = registry.activeRooms()
         assert("ws-1" in active)
         assert("ws-2" !in active)
+        assert("__presence__" !in active)  // internal room excluded
     }
 
     @Test

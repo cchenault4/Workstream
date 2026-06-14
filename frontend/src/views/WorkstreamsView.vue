@@ -76,6 +76,9 @@ onMounted(() => {
   load()
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   presenceSocket = new WebSocket(`${protocol}//${window.location.host}/ws`)
+  presenceSocket.onopen = () => {
+    presenceSocket!.send(JSON.stringify({ type: 'presence:subscribe' }))
+  }
   presenceSocket.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data as string)
