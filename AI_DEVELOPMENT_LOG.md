@@ -191,3 +191,174 @@ curl -X POST http://localhost:8080/workstreams \
 - **In-memory storage**: all state is lost on restart. Replacing the three `InMemory*` repository
   implementations with database-backed ones requires no changes outside `adapter/outbound/persistence/`
   and `Application.kt`.
+
+---
+
+## Phase 2: Frontend SPA
+
+After the backend was complete, a Vue 3 + Vite single-page application was built using Claude Code
+as the sole implementation tool. All architectural decisions, feature choices, and UI direction came
+from human prompts; Claude Code translated them into working code.
+
+### Tech stack
+
+- **Vue 3.5** with `<script setup>` and Composition API
+- **Vue Router 4**
+- **Vite 8** (dev server with `/api` and `/ws` proxy to port 8080)
+- **Vitest 4** + **@vue/test-utils** + **happy-dom** for testing
+- No CSS framework — hand-written scoped styles and a shared `style.css`
+
+### Feature development
+
+#### Workstreams list (`WorkstreamsView`)
+
+> *"Now let's add non-goals."*
+> *"Now let's add the verification plan."*
+
+The list view and create form were built incrementally through short, directive prompts. Each prompt
+extended the existing component rather than replacing it.
+
+#### Workstream detail (`WorkstreamDetailView`)
+
+The detail view was the most iterative part of the frontend. Key prompts and their outcomes:
+
+> *"Now I want to add three tabs to the WorkstreamDetail page: Implementation Plan, Readiness and Activity."*
+
+Claude Code restructured the flat detail page into a tabbed layout. The plan form and display,
+readiness gate grid, and activity feed each became a separate tab panel. Readiness was extracted
+from its previous location inside the plan card and given its own dedicated tab.
+
+> *"Please move the connection notification to the Workflows page. When someone is in Workflow
+> detail, they already know they are connected. I'm not sure what the text should be, but let's
+> change it from 'Live' to 'Active'."*
+
+The presence indicator was moved from the detail page to the workstreams list table. Claude Code
+surfaced "Active" as the label and placed it as a badge in a dedicated column next to the title.
+
+#### Real-time presence and list updates
+
+The presence system required three implementation iterations before working correctly:
+
+1. **Attempt 1** — `broadcastAll` / `allSessions`: sessions were iterated from the registry but
+   the receiving component never received frames. Root cause: the helper used a different session
+   collection path than the proven `broadcast(room, message)` path.
+2. **Attempt 2** — `scope.launch { broadcastAll }`: wrapping in a coroutine fixed the suspension
+   issue but broadcasts still did not arrive. The underlying `allSessions` iteration was still
+   broken.
+3. **Attempt 3** — Dedicated internal room (`__workstreams__`): clients sending
+   `workstreams:subscribe` join a special room. The publisher calls `broadcast("__workstreams__",
+   message)`, reusing the proven room-broadcast mechanism. This worked immediately.
+
+This experience illustrates a common pattern with AI-assisted debugging: when a fix attempt does
+not work, the most productive next step is often to re-examine the fundamental mechanism rather
+than patch around the symptom.
+
+> *"You can replace presence with workstreams."*
+
+After the system was working with a `__presence__` room, the human directed renaming to
+`__workstreams__` and `workstreams:subscribe` to better reflect that the channel carries both
+presence and data updates. Claude Code propagated the rename across the backend route handler,
+frontend composable, and all references in a single pass.
+
+#### Active field in REST list endpoint
+
+> *"Now that we have Active being updated in realtime on the Workstreams page, let's update all
+> of the data in Workstreams in realtime. Also, let's add active to the REST call to get workstreams."*
+
+Claude Code introduced a `WorkstreamSummary` DTO with an `active: Boolean` field derived at
+request time from `registry.activeRooms()`. The list endpoint now returns live presence state
+without touching the domain model. The frontend initialises `activeWorkstreamIds` from this field
+on load, then keeps it current via WebSocket.
+
+#### Duplicate-on-create race condition
+
+Two instances of the same race condition appeared at different times:
+
+1. **Activity duplication**: posting an activity event via the form caused it to appear twice —
+   once from the immediate HTTP response and once from the WebSocket broadcast that fired while
+   the POST was still in flight. Fixed with an `id`-based dedup check before `unshift`.
+2. **Workstream creation duplication**: the same race existed in the create-workstream form. The
+   same dedup pattern was applied.
+
+### Component and composable extraction
+
+> *"What do you think about creating some components?"*
+> *"There is a WebSocket in WorkstreamsView and some low level detail around that that I'd like to
+> move down. Please move that to useWorkStreamSocket."*
+
+Claude Code proposed a short list of extraction candidates; the human selected which to proceed
+with. The following were extracted:
+
+| What | Where | Why |
+|------|-------|-----|
+| `Badge.vue` | `components/` | Badge markup was duplicated across both views |
+| `StringList.vue` | `components/` | Read-only string list used for non-goals, assumptions, verification plan |
+| `StringListField.vue` | `components/` | Editable string list (add/remove rows) used in the plan form |
+| `useWorkstreamSocket` | `composables/` | Detail page WS lifecycle (join/leave, message dispatch) |
+| `useWorkstreamsSocket` | `composables/` | List page WS subscription (presence + data updates) |
+| `utils/badges.ts` | `utils/` | Badge variant class maps shared between views |
+| `utils/format.ts` | `utils/` | `formatDate` / `formatDateTime` shared between views |
+
+### Human overrides — frontend
+
+**1. UI layout and visual design decisions**
+
+All layout decisions were human-directed: the three-line header (title + meta / description /
+priority+status), the width cap on the status and priority selectors, column sizing in the
+workstreams table, and the tab layout for the detail view. Claude Code implemented each directive
+but did not propose the visual structure unprompted.
+
+**2. Naming: "Active" not "Live"**
+
+Claude Code used "Live" in the initial presence badge. The human specified "Active" as the correct
+label. The rename was applied to the badge text, column header, and composable variable names.
+
+**3. API method naming convention**
+
+> *"Let's add the word Workstream to the api calls for workstreams. For now, just change list,
+> create, get and update."*
+
+Claude Code had named the API methods `list`, `create`, `get`, `update`. The human directed
+renaming to `listWorkstreams`, `createWorkstream`, `getWorkstream`, `updateWorkstream` to make
+call sites self-documenting. Claude Code applied the rename across all call sites.
+
+**4. Scope of component extraction**
+
+When Claude Code proposed abstracting Open Questions and Phases into components alongside the
+string-list components, the human chose to scope the extraction to the simpler string lists only:
+
+> *"Let's skip OpenQuestions and Phases for now. I may come back to them."*
+
+This prevented premature abstraction of the more complex structures.
+
+### Frontend test suite
+
+> *"We need tests for the front end. How do you recommend creating a comprehensive test package?"*
+> *"Yes, go ahead."*
+
+Claude Code proposed the stack (Vitest + @vue/test-utils + happy-dom, with `vi.mock` for the API
+layer rather than MSW), explained the tradeoff, and implemented the full suite after human
+approval. 64 tests across 8 files:
+
+| Layer | Files | Tests | What is covered |
+|-------|-------|-------|-----------------|
+| Utils | 2 | 8 | Badge class maps, date formatting |
+| Components | 3 | 12 | Badge rendering, StringList empty/non-empty, StringListField add/remove |
+| Composables | 1 | 13 | WS join/leave protocol, all message type dispatch, malformed frame handling, dedup of presence ids |
+| Views | 2 | 31 | Load/error states, create form, navigation, dedup race conditions, real-time update handlers, tab switching, plan/readiness/activity display, edit flow |
+
+The composable tests use a `MockWebSocket` class that replaces the global `WebSocket` constructor.
+The view tests mock the composable module and capture the registered handlers, allowing tests to
+simulate WebSocket events directly without a real connection.
+
+The race-condition dedup tests use deferred promises (a `Promise` whose `resolve` is held outside
+the mock) to control the order in which the HTTP response and the WebSocket broadcast are processed,
+verifying that only one item appears regardless of which arrives first.
+
+### Verification — combined
+
+| Layer | Tests | Runner |
+|-------|-------|--------|
+| Backend (Kotlin) | 81 | `gradle test` |
+| Frontend (TypeScript/Vue) | 64 | `npm test` |
+| **Total** | **145** | |
