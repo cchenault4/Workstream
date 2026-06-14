@@ -38,7 +38,7 @@ async function updateStatus(status: WorkstreamStatus) {
   if (!workstream.value) return
   statusSaving.value = true
   try {
-    workstream.value = await workstreamsApi.update(id, { status })
+    workstream.value = await workstreamsApi.updateWorkstream(id, { status })
   } finally {
     statusSaving.value = false
   }
@@ -50,7 +50,7 @@ async function updatePriority(priority: Priority) {
   if (!workstream.value) return
   prioritySaving.value = true
   try {
-    workstream.value = await workstreamsApi.update(id, { priority })
+    workstream.value = await workstreamsApi.updateWorkstream(id, { priority })
   } finally {
     prioritySaving.value = false
   }
@@ -74,7 +74,7 @@ async function saveEdit() {
   editSaving.value = true
   editError.value  = null
   try {
-    workstream.value = await workstreamsApi.update(id, {
+    workstream.value = await workstreamsApi.updateWorkstream(id, {
       title: editTitle.value,
       description: editDesc.value,
     })
@@ -222,7 +222,7 @@ async function addActivity() {
 // ── Load ──────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   try {
-    workstream.value = await workstreamsApi.get(id)
+    workstream.value = await workstreamsApi.getWorkstream(id)
     const [planRes, activitiesRes] = await Promise.allSettled([
       workstreamsApi.getPlan(id),
       workstreamsApi.getActivity(id),

@@ -25,7 +25,7 @@ async function load() {
   loading.value = true
   loadError.value = null
   try {
-    workstreams.value = await workstreamsApi.list()
+    workstreams.value = await workstreamsApi.listWorkstreams()
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : 'Failed to load'
   } finally {
@@ -37,7 +37,7 @@ async function submit() {
   submitting.value = true
   submitError.value = null
   try {
-    const created = await workstreamsApi.create(form.value)
+    const created = await workstreamsApi.createWorkstream(form.value)
     workstreams.value.unshift(created)
     showForm.value = false
     form.value = { title: '', description: '', requester: '', priority: 'MEDIUM' }

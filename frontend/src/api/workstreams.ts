@@ -24,16 +24,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const workstreamsApi = {
-  list: () =>
+  listWorkstreams: () =>
     request<Workstream[]>('/workstreams'),
 
-  create: (payload: CreateWorkstreamRequest) =>
+  createWorkstream: (payload: CreateWorkstreamRequest) =>
     request<Workstream>('/workstreams', { method: 'POST', body: JSON.stringify(payload) }),
 
-  get: (id: string) =>
+  getWorkstream: (id: string) =>
     request<Workstream>(`/workstreams/${id}`),
 
-  update: (id: string, payload: UpdateWorkstreamRequest) =>
+  updateWorkstream: (id: string, payload: UpdateWorkstreamRequest) =>
     request<Workstream>(`/workstreams/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
 
   getPlan: (id: string) =>
