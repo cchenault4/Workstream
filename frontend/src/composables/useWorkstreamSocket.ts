@@ -12,6 +12,12 @@ interface Handlers {
   onPlanUpdated?: (plan: Plan) => void
 }
 
+/** Creates a WebSocket connection to the /ws endpoint, using wss: on HTTPS. */
+export function makeWsSocket(): WebSocket {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return new WebSocket(`${protocol}//${window.location.host}/ws`)
+}
+
 /**
  * Manages a WebSocket connection to a single workstream room.
  * Joins on open, leaves and closes on component unmount.
@@ -20,8 +26,7 @@ interface Handlers {
 export function useWorkstreamSocket(workstreamId: string, handlers: Handlers) {
   const connected = ref(false)
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const socket = new WebSocket(`${protocol}//${window.location.host}/ws`)
+  const socket = makeWsSocket()
 
   socket.onopen = () => {
     connected.value = true

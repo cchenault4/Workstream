@@ -17,3 +17,71 @@ body {
   max-width: 1400px;
   margin: 0 auto;
 }
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn-primary {
+  padding: 0.45rem 1rem;
+  background: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-primary:hover:not(:disabled) { background: #4338ca; }
+.btn-primary:disabled { opacity: 0.6; cursor: default; }
+
+.btn-secondary {
+  padding: 0.35rem 0.85rem;
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-secondary:hover { background: #f3f4f6; }
+
+.btn-ghost {
+  padding: 0.45rem 1rem;
+  background: transparent;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.btn-ghost:hover { background: #f3f4f6; }
+
+.btn-sm { padding: 0.25rem 0.65rem; font-size: 0.8rem; }
+
+/* ── Badges ───────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-low       { background: #f3f4f6; color: #6b7280; }
+.badge-medium    { background: #fef3c7; color: #92400e; }
+.badge-high      { background: #fee2e2; color: #991b1b; }
+.badge-new       { background: #dbeafe; color: #1e40af; }
+.badge-planning  { background: #ede9fe; color: #5b21b6; }
+.badge-executing { background: #ffedd5; color: #9a3412; }
+.badge-reviewing { background: #fef9c3; color: #854d0e; }
+.badge-verified  { background: #d1fae5; color: #065f46; }
+.badge-blocked   { background: #fee2e2; color: #991b1b; }
+.badge-active    { background: #d1fae5; color: #065f46; }
+
+/* ── Misc utilities ───────────────────────────────────────────────────────── */
+.state-msg { color: #6b7280; text-align: center; padding: 2rem 0; font-size: 0.9rem; }
+.error     { color: #991b1b; font-size: 0.85rem; }
+.muted     { color: #9ca3af; }
+.small     { font-size: 0.8rem; }

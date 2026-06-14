@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { workstreamsApi } from '../api/workstreams'
-import type { CreateWorkstreamRequest, Priority, Workstream } from '../types/workstream'
+import { makeWsSocket } from '../composables/useWorkstreamSocket'
+import { PRIORITY_CLASS, STATUS_CLASS } from '../utils/badges'
+import { formatDate } from '../utils/format'
+import type { CreateWorkstreamRequest, Workstream } from '../types/workstream'
 
 const workstreams = ref<Workstream[]>([])
 const loading = ref(true)
@@ -51,33 +54,13 @@ function cancelForm() {
   form.value = { title: '', description: '', requester: '', priority: 'MEDIUM' }
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-const PRIORITY_CLASS: Record<Priority, string> = {
-  LOW: 'badge-low',
-  MEDIUM: 'badge-medium',
-  HIGH: 'badge-high',
-}
-
-const STATUS_CLASS: Record<Workstream['status'], string> = {
-  NEW: 'badge-new',
-  PLANNING: 'badge-planning',
-  EXECUTING: 'badge-executing',
-  REVIEWING: 'badge-reviewing',
-  VERIFIED: 'badge-verified',
-  BLOCKED: 'badge-blocked',
-}
-
 let presenceSocket: WebSocket | null = null
 let presenceMounted = false
 
 onMounted(() => {
   presenceMounted = true
   load()
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  presenceSocket = new WebSocket(`${protocol}//${window.location.host}/ws`)
+  presenceSocket = makeWsSocket()
   presenceSocket.onopen = () => {
     if (!presenceMounted) return
     presenceSocket!.send(JSON.stringify({ type: 'presence:subscribe' }))
@@ -258,33 +241,6 @@ input:focus, textarea:focus, select:focus {
   gap: 0.5rem;
 }
 
-/* Buttons */
-.btn-primary {
-  padding: 0.45rem 1rem;
-  background: #4f46e5;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.btn-primary:hover:not(:disabled) { background: #4338ca; }
-.btn-primary:disabled { opacity: 0.6; cursor: default; }
-
-.btn-ghost {
-  padding: 0.45rem 1rem;
-  background: transparent;
-  color: #374151;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-
-.btn-ghost:hover { background: #f3f4f6; }
-
 /* Table */
 table {
   width: auto;
@@ -317,34 +273,4 @@ tr.clickable:hover td { background: #f9fafb; }
 
 .cell-title { font-weight: 500; white-space: normal; min-width: 200px; }
 .cell-date  { color: #9ca3af; }
-
-.badge-active { background: #d1fae5; color: #065f46; }
-
-/* Badges */
-.badge {
-  display: inline-block;
-  padding: 0.2rem 0.55rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.badge-low      { background: #f3f4f6; color: #6b7280; }
-.badge-medium   { background: #fef3c7; color: #92400e; }
-.badge-high     { background: #fee2e2; color: #991b1b; }
-
-.badge-new       { background: #dbeafe; color: #1e40af; }
-.badge-planning  { background: #ede9fe; color: #5b21b6; }
-.badge-executing { background: #ffedd5; color: #9a3412; }
-.badge-reviewing { background: #fef9c3; color: #854d0e; }
-.badge-verified  { background: #d1fae5; color: #065f46; }
-.badge-blocked   { background: #fee2e2; color: #991b1b; }
-
-/* Misc */
-.state-msg { color: #6b7280; text-align: center; padding: 2rem 0; font-size: 0.9rem; }
-.error     { color: #991b1b; }
-.muted     { color: #9ca3af; }
 </style>

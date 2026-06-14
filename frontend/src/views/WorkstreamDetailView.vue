@@ -3,6 +3,8 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { workstreamsApi } from '../api/workstreams'
 import { useWorkstreamSocket } from '../composables/useWorkstreamSocket'
+import { ACTIVITY_CLASS, PHASE_CLASS, PRIORITY_CLASS, QUESTION_TYPE_CLASS, STATUS_CLASS } from '../utils/badges'
+import { formatDate, formatDateTime } from '../utils/format'
 import type {
   ActivityEvent,
   ActivityType,
@@ -262,37 +264,11 @@ const { connected } = useWorkstreamSocket(id, {
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const PRIORITIES: Priority[]        = ['LOW', 'MEDIUM', 'HIGH']
-const STATUSES: WorkstreamStatus[] = ['NEW', 'PLANNING', 'EXECUTING', 'REVIEWING', 'VERIFIED', 'BLOCKED']
+const PRIORITIES: Priority[]         = ['LOW', 'MEDIUM', 'HIGH']
+const STATUSES: WorkstreamStatus[]   = ['NEW', 'PLANNING', 'EXECUTING', 'REVIEWING', 'VERIFIED', 'BLOCKED']
 const ACTIVITY_TYPES: ActivityType[] = ['CONTEXT_DISCOVERY', 'PLANNING', 'IMPLEMENTATION', 'REVIEW', 'VERIFICATION', 'HANDOFF']
-const PHASE_STATUSES: PhaseStatus[]    = ['PENDING', 'IN_PROGRESS', 'COMPLETE', 'BLOCKED']
-const QUESTION_TYPES: QuestionType[]   = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
-
-const PRIORITY_CLASS: Record<string, string> = {
-  LOW: 'badge-low', MEDIUM: 'badge-medium', HIGH: 'badge-high',
-}
-const STATUS_CLASS: Record<string, string> = {
-  NEW: 'badge-new', PLANNING: 'badge-planning', EXECUTING: 'badge-executing',
-  REVIEWING: 'badge-reviewing', VERIFIED: 'badge-verified', BLOCKED: 'badge-blocked',
-}
-const QUESTION_TYPE_CLASS: Record<QuestionType, string> = {
-  BLOCKING: 'badge-blocked', ASSUMABLE: 'badge-planning', DEFERRABLE: 'badge-low',
-}
-const PHASE_CLASS: Record<PhaseStatus, string> = {
-  PENDING: 'badge-low', IN_PROGRESS: 'badge-executing', COMPLETE: 'badge-verified', BLOCKED: 'badge-blocked',
-}
-const ACTIVITY_CLASS: Record<ActivityType, string> = {
-  CONTEXT_DISCOVERY: 'badge-new', PLANNING: 'badge-planning', IMPLEMENTATION: 'badge-executing',
-  REVIEW: 'badge-reviewing', VERIFICATION: 'badge-verified', HANDOFF: 'badge-low',
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
+const PHASE_STATUSES: PhaseStatus[]  = ['PENDING', 'IN_PROGRESS', 'COMPLETE', 'BLOCKED']
+const QUESTION_TYPES: QuestionType[] = ['BLOCKING', 'ASSUMABLE', 'DEFERRABLE']
 </script>
 
 <template>
@@ -962,68 +938,4 @@ input:focus, textarea:focus, select:focus {
   gap: 0.5rem;
 }
 
-/* Buttons */
-.btn-primary {
-  padding: 0.45rem 1rem;
-  background: #4f46e5;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-.btn-primary:hover:not(:disabled) { background: #4338ca; }
-.btn-primary:disabled { opacity: 0.6; cursor: default; }
-
-.btn-secondary {
-  padding: 0.35rem 0.85rem;
-  background: white;
-  color: #374151;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-.btn-secondary:hover { background: #f3f4f6; }
-
-.btn-ghost {
-  padding: 0.45rem 1rem;
-  background: transparent;
-  color: #374151;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-.btn-ghost:hover { background: #f3f4f6; }
-
-/* Badges (duplicated here so this view is self-contained) */
-.badge {
-  display: inline-block;
-  padding: 0.2rem 0.55rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.badge-low       { background: #f3f4f6; color: #6b7280; }
-.badge-medium    { background: #fef3c7; color: #92400e; }
-.badge-high      { background: #fee2e2; color: #991b1b; }
-.badge-new       { background: #dbeafe; color: #1e40af; }
-.badge-planning  { background: #ede9fe; color: #5b21b6; }
-.badge-executing { background: #ffedd5; color: #9a3412; }
-.badge-reviewing { background: #fef9c3; color: #854d0e; }
-.badge-verified  { background: #d1fae5; color: #065f46; }
-.badge-blocked   { background: #fee2e2; color: #991b1b; }
-
-/* Misc */
-.state-msg { color: #6b7280; text-align: center; padding: 2rem 0; font-size: 0.9rem; }
-.error     { color: #991b1b; font-size: 0.85rem; }
-.muted     { color: #9ca3af; }
-.small     { font-size: 0.8rem; }
 </style>
