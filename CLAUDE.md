@@ -31,7 +31,7 @@ documents AI tool usage and is required as part of the submission.
 
 ```
 POST   /workstreams          → Workstream
-GET    /workstreams          → WorkstreamSummary[]  (includes active: Boolean derived from registry)
+GET    /workstreams          → WorkstreamSummary[]  (includes active: Boolean)
 GET    /workstreams/:id      → Workstream
 PATCH  /workstreams/:id      → Workstream
 PUT    /workstreams/:id/plan → Plan
@@ -42,13 +42,15 @@ GET    /workstreams/:id/activity  → ActivityEvent[]
 ```
 
 `GET /workstreams` returns `WorkstreamSummary` (not `Workstream`) — a DTO in
-`adapter/inbound/http/WorkstreamSummary.kt` that adds `active: Boolean` derived at request time
-from `registry.activeRooms()`. The domain `Workstream` model has no `active` field.
+`application/dto/WorkstreamSummary.kt` that adds `active: Boolean`. The `active` flag is resolved
+by `WorkstreamUseCase.list()`, which queries `PresenceRegistry` internally. The domain `Workstream`
+model has no `active` field.
 
 ## Real-Time (Ktor WebSockets — not Socket.IO)
 
 There is no Socket.IO library for Ktor. Real-time uses native Ktor WebSockets with a JSON envelope
-protocol. The `WebSocketSessionRegistry` manages rooms; `WebSocketEventPublisher` broadcasts.
+protocol. `WebSocketSessionRegistry` manages broadcast sessions; `WebSocketEventPublisher` sends
+frames; `PresenceUseCase` owns all presence business logic.
 
 **Client → server:**
 ```json
@@ -60,24 +62,31 @@ protocol. The `WebSocketSessionRegistry` manages rooms; `WebSocketEventPublisher
 **Server → client:**
 ```json
 { "type": "activity:created",    "data": { ...ActivityEvent } }
-{ "type": "workstream:updated",  "data": { ...Workstream } }
+{ "type": "workstream:updated",  "data": { ...Workstream, "active": true } }
 { "type": "plan:updated",        "data": { ...Plan } }
-{ "type": "workstream:presence", "data": { "workstreamId": "<id>", "active": true } }
 ```
 
-`workstream:presence` is sent to `workstreams:subscribe` clients when any client joins or leaves a
-workstream room. The list page uses this to drive the "Active" badge in real time.
+`workstream:updated` carries the `active` flag on every broadcast — both for data mutations and
+for presence changes (join/leave). The list page uses this to drive the "Active" badge in real time.
 
-**Internal rooms:** `__workstreams__` is an internal room (filtered from `activeRooms()` by the
-`__` prefix convention). The publisher broadcasts `workstream:updated` to both the workstream's
-own room and `__workstreams__` so list-page subscribers also receive data updates.
+**Internal rooms:** `__workstreams__` is an internal room (identified by the `__` prefix). The
+publisher broadcasts `workstream:updated` to both the workstream's own room and `__workstreams__`
+so list-page subscribers also receive data updates and presence changes.
+
+**Presence flow:** On `workstream:join`, the WebSocket route registers the session in
+`WebSocketSessionRegistry` (for broadcasting) and calls `PresenceUseCase.workstreamJoined`, which
+increments the `PresenceRegistry` count and publishes `workstream:updated` with `active=true`.
+On `workstream:leave` or disconnect, the reverse happens — `PresenceUseCase.workstreamLeft`
+decrements the count and publishes with the post-leave active state. `WebSocketSessionRegistry`
+also tracks which rooms each session occupies (via `leaveAll`) so disconnect cleanup requires no
+local state in the route handler.
 
 ## Backend Commands
 
 Run from the project root (`/Users/chrischenault/IdeaProjects/Workstream`), **not** from `frontend/`:
 
 ```bash
-gradle test          # run all 81 backend tests
+gradle test          # run all 85 backend tests
 gradle test --tests "digital.honeybadger.workflow.SomeTest"
 gradle run           # start server on port 8080
 gradle build         # compile + test + assemble jar
@@ -101,22 +110,32 @@ The Vite dev server proxies `/api/*` → `http://localhost:8080` (strips `/api` 
 
 Hexagonal (Ports & Adapters). Manual DI in `Application.kt:module()`:
 
-1. In-memory repositories and `DefaultWebSocketSessionRegistry` created
+1. In-memory repositories, `DefaultWebSocketSessionRegistry`, and `InMemoryPresenceRegistry` created
 2. `WebSocketEventPublisher` created with the `Application` as its `CoroutineScope`
-3. Use cases created with repositories and publisher
+3. Use cases created with repositories, `PresenceRegistry`, and publisher
 4. `configurePlugins()` → `configureRouting()` → `configureHttpRoutes(...)` → `configureWebSocketRoutes(...)`
 
 ```
 domain/model/           — pure data classes/enums, no framework deps
 domain/service/         — ReadinessService: pure computation, no I/O
-application/port/inbound/  — WorkstreamUseCase, PlanUseCase, ActivityUseCase (interfaces)
-application/port/outbound/ — repository + EventPublisher interfaces
+application/dto/        — WorkstreamSummary and other request/response DTOs
+application/port/inbound/  — WorkstreamUseCase, PlanUseCase, ActivityUseCase, PresenceUseCase
+application/port/outbound/ — repository + EventPublisher + PresenceRegistry interfaces
 application/usecase/    — implements inbound ports, depends only on outbound ports
-adapter/inbound/http/   — Ktor routes + StatusPages; WorkstreamSummary DTO lives here
-adapter/inbound/websocket/ — WebSocket route, DefaultWebSocketSessionRegistry
-adapter/outbound/persistence/ — InMemory* repositories
+adapter/inbound/http/   — Ktor routes + StatusPages
+adapter/inbound/websocket/ — WebSocket route, WebSocketSessionRegistry / DefaultWebSocketSessionRegistry
+adapter/outbound/persistence/ — InMemory* repositories + InMemoryPresenceRegistry
 adapter/outbound/realtime/    — WebSocketEventPublisher
 ```
+
+**Key boundary rules:**
+- Adapters call inbound ports (use cases) only — never outbound ports directly
+- `PresenceRegistry` is an outbound port accessed only from use cases (`PresenceService`,
+  `WorkstreamService`), not from adapters
+- `EventPublisher.publishWorkstreamUpdate(workstream, active: Boolean)` takes an explicit `active`
+  value; the publisher is a pure transport adapter and does not query presence state itself
+- `WebSocketSessionRegistry` is adapter-internal infrastructure for broadcasting; it does not
+  determine active workstreams (that is `PresenceRegistry`'s job)
 
 ## Frontend Architecture
 
@@ -142,7 +161,7 @@ frontend/src/
 - `useWorkstreamSocket(id, handlers)` — joins/leaves a single workstream room; calls
   `onActivity`, `onWorkstreamUpdated`, `onPlanUpdated` handlers; sends `workstream:leave` on unmount
 - `useWorkstreamsSocket(handlers?)` — sends `workstreams:subscribe`; updates `activeWorkstreamIds`
-  ref on `workstream:presence` messages; calls `onWorkstreamUpdated` handler
+  ref on `workstream:updated` messages with `active` field; calls `onWorkstreamUpdated` handler
 
 **Dedup pattern:** Both activity creation and workstream creation have a race condition where the
 WebSocket broadcast arrives before the POST response. The guard is:
@@ -160,6 +179,6 @@ Applied in `addActivity()`, `submit()` (WorkstreamsView), and the WS `onActivity
 | Language | Kotlin 2.2.0 | TypeScript |
 | Framework | Ktor 3.1.3 (Netty) | Vue 3.5 + Vite 8 |
 | Build | Gradle 9.x (Kotlin DSL) | npm |
-| Testing | MockK + testApplication (81 tests) | Vitest + @vue/test-utils (64 tests) |
+| Testing | MockK + testApplication (85 tests) | Vitest + @vue/test-utils (64 tests) |
 | Storage | In-memory (no DB) | — |
 | Real-time | Ktor WebSockets | Native WebSocket API |
