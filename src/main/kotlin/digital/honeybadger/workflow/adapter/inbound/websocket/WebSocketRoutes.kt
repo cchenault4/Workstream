@@ -56,14 +56,15 @@ fun Application.configureWebSocketRoutes(
                             registry.join(msg.workstreamId, this)
                             joinedRooms.add(msg.workstreamId)
                             log.info("[{}] joined workstream={}", sessionId, msg.workstreamId)
-                            scope.launch { broadcastPresence(msg.workstreamId, workstreamUseCase, publisher) }
+                            scope.launch { broadcastPresence(msg.workstreamId, active = true, workstreamUseCase, publisher) }
                         }
                         "workstream:leave" -> {
                             if (msg.workstreamId.isBlank()) continue
                             registry.leave(msg.workstreamId, this)
                             joinedRooms.remove(msg.workstreamId)
-                            log.info("[{}] left workstream={}", sessionId, msg.workstreamId)
-                            scope.launch { broadcastPresence(msg.workstreamId, workstreamUseCase, publisher) }
+                            val stillActive = registry.roomSize(msg.workstreamId) > 0
+                            log.info("[{}] left workstream={} stillActive={}", sessionId, msg.workstreamId, stillActive)
+                            scope.launch { broadcastPresence(msg.workstreamId, active = stillActive, workstreamUseCase, publisher) }
                         }
                     }
                 }
@@ -72,7 +73,8 @@ fun Application.configureWebSocketRoutes(
                 joinedRooms.forEach { wid ->
                     registry.leave(wid, this)
                     if (wid != WORKSTREAMS_ROOM) {
-                        scope.launch { broadcastPresence(wid, workstreamUseCase, publisher) }
+                        val stillActive = registry.roomSize(wid) > 0
+                        scope.launch { broadcastPresence(wid, active = stillActive, workstreamUseCase, publisher) }
                     }
                 }
             }
@@ -80,8 +82,8 @@ fun Application.configureWebSocketRoutes(
     }
 }
 
-private fun broadcastPresence(workstreamId: String, useCase: WorkstreamUseCase, publisher: EventPublisher) {
+private fun broadcastPresence(workstreamId: String, active: Boolean, useCase: WorkstreamUseCase, publisher: EventPublisher) {
     runCatching { useCase.getById(workstreamId) }
-        .onSuccess { publisher.publishWorkstreamUpdate(it) }
+        .onSuccess { publisher.publishPresenceUpdate(it, active) }
         .onFailure { log.warn("workstream {} not found for presence broadcast", workstreamId) }
 }

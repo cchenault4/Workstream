@@ -49,6 +49,25 @@ class WebSocketEventPublisherTest {
     }
 
     @Test
+    fun `publishPresenceUpdate broadcasts workstream-updated with explicitly provided active value`() = runTest {
+        val ws = Workstream("ws-1", "Title", "Desc", "alice", Priority.HIGH, WorkstreamStatus.NEW, now, now)
+
+        publisher.publishPresenceUpdate(ws, active = true)
+
+        coVerify { registry.broadcast("ws-1", match { it.contains("\"active\":true") }) }
+        coVerify { registry.broadcast("__workstreams__", match { it.contains("\"active\":true") }) }
+    }
+
+    @Test
+    fun `publishPresenceUpdate does not call registry activeRooms`() = runTest {
+        val ws = Workstream("ws-1", "Title", "Desc", "alice", Priority.HIGH, WorkstreamStatus.NEW, now, now)
+
+        publisher.publishPresenceUpdate(ws, active = true)
+
+        verify(exactly = 0) { registry.activeRooms() }
+    }
+
+    @Test
     fun `publishPlanUpdate broadcasts plan-updated to the plan's workstream room`() = runTest {
         val plan = Plan(workstreamId = "ws-1", goal = "Goal")
 

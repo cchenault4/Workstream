@@ -28,10 +28,13 @@ class WebSocketEventPublisher(
         scope.launch { registry.broadcast(event.workstreamId, message) }
     }
 
-    override fun publishWorkstreamUpdate(workstream: Workstream) {
-        // Include the live active status so the list page can update the Active badge
-        // from the same workstream:updated event rather than a separate presence message.
-        val active = workstream.id in registry.activeRooms()
+    override fun publishWorkstreamUpdate(workstream: Workstream) =
+        broadcastWorkstreamUpdated(workstream, active = workstream.id in registry.activeRooms())
+
+    override fun publishPresenceUpdate(workstream: Workstream, active: Boolean) =
+        broadcastWorkstreamUpdated(workstream, active)
+
+    private fun broadcastWorkstreamUpdated(workstream: Workstream, active: Boolean) {
         val wsJson = json.encodeToJsonElement(workstream).jsonObject
         val payload = buildJsonObject {
             wsJson.entries.forEach { entry -> put(entry.key, entry.value) }

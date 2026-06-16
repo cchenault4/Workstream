@@ -50,6 +50,9 @@ class WebSocketRouteTest {
             send(Frame.Text("""{"type":"workstream:join","workstreamId":"ws-1"}"""))
             send(Frame.Text("""{"type":"workstream:leave","workstreamId":"ws-1"}"""))
         }
+        // Join calls publishPresenceUpdate with active=true; leave calls it with active=false
+        verify { publisher.publishPresenceUpdate(any(), true) }
+        verify { publisher.publishPresenceUpdate(any(), false) }
     }
 
     @Test
