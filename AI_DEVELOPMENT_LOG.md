@@ -355,10 +355,116 @@ The race-condition dedup tests use deferred promises (a `Promise` whose `resolve
 the mock) to control the order in which the HTTP response and the WebSocket broadcast are processed,
 verifying that only one item appears regardless of which arrives first.
 
-### Verification — combined
+### Verification — combined (after Phase 2)
 
 | Layer | Tests | Runner |
 |-------|-------|--------|
 | Backend (Kotlin) | 81 | `gradle test` |
 | Frontend (TypeScript/Vue) | 64 | `npm test` |
 | **Total** | **145** | |
+
+---
+
+## Phase 3: Presence Architecture Refactoring
+
+After the frontend was complete, a code review identified that presence tracking had leaked business
+logic into the adapter layer. Claude Code was used to design and execute a targeted refactoring
+under human direction.
+
+### Identifying the violation
+
+> *"Part of the function of this project is that we are tracking whether someone is present in a
+> Workstream. We are using a hexagonal architecture, but the presence behavior is not represented
+> in a use case. This results in some business logic in the WebSocketRoutes.kt file. Not good.
+> Please rethink the inbound ports to correct this."*
+
+Claude Code identified the specific violations: a private `broadcastPresence` function in the
+WebSocket route that validated workstream existence, computed the `active` boolean, and called the
+publisher; an inline `registry.roomSize(wid) > 0` business rule; and direct dependencies on both
+`WorkstreamUseCase` and `EventPublisher` from within an adapter.
+
+The proposed fix: a new `PresenceUseCase` inbound port, a `PresenceRegistry` outbound port, and a
+`PresenceService` implementation.
+
+### Human overrides — presence refactoring
+
+**1. `joinedRooms` belongs in the use case, not the route**
+
+Claude Code's initial implementation moved the broadcast logic into `PresenceService` but left
+`joinedRooms: MutableSet<String>` as local state in the WebSocket route handler. The human
+directed this to move to `PresenceRegistry` through `PresenceUseCase`:
+
+> *"The WebSocketRoutes.kt file should not be keeping track of joinedRooms. It should be storing
+> this information in the PresenceRegistry through the PresenceUseCase. The WebSocketSessionRegistry
+> can keep track of the sessions, but it should not be keeping track of the active workstreams. It
+> should defer to the use case for that."*
+
+This also drove the removal of `activeRooms()` and `roomSize()` from `WebSocketSessionRegistry` —
+those methods were presence concerns that belonged in `PresenceRegistry`.
+
+**2. Do not add new tracking mechanisms — only refactor existing ones**
+
+Claude Code proposed a `PresenceRegistry` with session-to-workstream reverse mapping
+(`join(sessionId, workstreamId)`, `leaveAll(sessionId)`). The human rejected this as scope creep:
+
+> *"We are only keeping track of how many sessions are associated with each workstream.
+> Let's stick with refactoring and not add more functionality."*
+
+The final `PresenceRegistry` outbound port tracks only subscriber counts (`join(workstreamId)`,
+`leave(workstreamId)`, `isActive`, `activeWorkstreamIds`). For disconnect cleanup, `leaveAll` was
+added to `WebSocketSessionRegistry` — it already held the session-to-room data needed to answer
+"which rooms was this session in?" at the adapter level, without the application layer needing to
+track it. This was accepted after a productive clarifying exchange about why some tracking is
+unavoidable.
+
+**3. `PresenceRegistry` must not be accessed directly from adapters**
+
+After the initial implementation, Claude Code had `WebSocketEventPublisher` (an outbound adapter)
+calling `presenceRegistry.isActive()` to compute the `active` flag, and `WorkstreamRoutes` (an
+inbound adapter) calling `presenceRegistry.activeWorkstreamIds()` for the list endpoint. The human
+identified both as violations:
+
+> *"Since we decided that presence was part of the application, the PresenceRegistry should not be
+> accessed directly by the adapters. It should only be accessed by the use cases."*
+
+Fixes:
+- `EventPublisher.publishWorkstreamUpdate` gained an explicit `active: Boolean` parameter; the
+  publisher became a pure transport adapter that sends what it is told
+- `WorkstreamService` received `PresenceRegistry` and passes `presenceRegistry.isActive(id)` when
+  calling `publishWorkstreamUpdate`
+- `PresenceUseCase` gained `activeWorkstreamIds()` so the HTTP route could call a use case instead
+  of the outbound port
+
+**4. `WorkstreamUseCase.list()` should return `WorkstreamSummary`**
+
+> *"Let's remove the presenceUseCase from WorkstreamRoutes and have WorkstreamUseCase.list()
+> return WorkstreamSummaries."*
+
+`WorkstreamSummary` was in `adapter/inbound/http/` — correct at the time, but once a use case
+returned it, it needed to move to `application/dto/` to avoid an upward adapter dependency. Claude
+Code identified this and moved the DTO before updating the use case signature. The route was
+reduced to a single `call.respond(useCase.list())` with no presence dependency at all. The
+`activeWorkstreamIds()` method on `PresenceUseCase`, added in the previous step, was then removed
+since nothing called it anymore.
+
+### What the refactoring produced
+
+The final state:
+- `PresenceRegistry` (outbound port) — counts only; accessed exclusively from use cases
+- `PresenceUseCase` (inbound port) — `workstreamJoined` / `workstreamLeft`; called by the WebSocket
+  route with no business logic remaining in the route handler
+- `PresenceService` — increments/decrements counts, resolves workstream, publishes updates
+- `WebSocketSessionRegistry` — broadcast sessions only; `leaveAll` supports disconnect cleanup
+  without any state in the route handler
+- `EventPublisher.publishWorkstreamUpdate(workstream, active: Boolean)` — explicit `active`
+  parameter; no outbound port is queried inside the adapter
+- `WorkstreamUseCase.list()` → `List<WorkstreamSummary>`; presence resolved internally by
+  `WorkstreamService`
+
+### Verification — after Phase 3
+
+| Layer | Tests | Runner |
+|-------|-------|--------|
+| Backend (Kotlin) | 85 | `gradle test` |
+| Frontend (TypeScript/Vue) | 64 | `npm test` |
+| **Total** | **149** | |
