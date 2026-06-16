@@ -1,6 +1,5 @@
 package digital.honeybadger.workflow.adapter.inbound.http
 
-import digital.honeybadger.workflow.adapter.inbound.websocket.WebSocketSessionRegistry
 import digital.honeybadger.workflow.application.exception.PlanNotFoundException
 import digital.honeybadger.workflow.application.exception.WorkstreamNotFoundException
 import digital.honeybadger.workflow.application.port.inbound.ActivityUseCase
@@ -12,19 +11,10 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-/**
- * Installs all HTTP routes and exception-to-status-code mappings.
- *
- * Purpose: single entry point for wiring the HTTP inbound adapter into the Ktor application.
- *          Separates exception handling from route definitions so each route file stays focused.
- * Invariants: [StatusPages] must be installed before routing processes a request — installing
- *             it here (before [routing]) guarantees that ordering.
- */
 fun Application.configureHttpRoutes(
     workstreamUseCase: WorkstreamUseCase,
     planUseCase: PlanUseCase,
     activityUseCase: ActivityUseCase,
-    registry: WebSocketSessionRegistry,
 ) {
     install(StatusPages) {
         exception<WorkstreamNotFoundException> { call, cause ->
@@ -41,7 +31,7 @@ fun Application.configureHttpRoutes(
         }
     }
     routing {
-        workstreamRoutes(workstreamUseCase, registry)
+        workstreamRoutes(workstreamUseCase)
         planRoutes(planUseCase)
         activityRoutes(activityUseCase)
     }

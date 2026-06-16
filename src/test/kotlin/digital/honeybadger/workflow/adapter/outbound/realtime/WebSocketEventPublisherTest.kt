@@ -13,8 +13,8 @@ import kotlin.test.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class WebSocketEventPublisherTest {
 
-    private val registry = mockk<WebSocketSessionRegistry>(relaxed = true)
-    private val publisher = WebSocketEventPublisher(registry, CoroutineScope(Dispatchers.Unconfined))
+    private val sessionRegistry = mockk<WebSocketSessionRegistry>(relaxed = true)
+    private val publisher = WebSocketEventPublisher(sessionRegistry, CoroutineScope(Dispatchers.Unconfined))
 
     private val now = Instant.parse("2024-06-01T12:00:00Z")
 
@@ -24,47 +24,26 @@ class WebSocketEventPublisherTest {
 
         publisher.publish(event)
 
-        coVerify { registry.broadcast("ws-1", match { it.contains("activity:created") }) }
+        coVerify { sessionRegistry.broadcast("ws-1", match { it.contains("activity:created") }) }
     }
 
     @Test
-    fun `publishWorkstreamUpdate broadcasts workstream-updated to workstream room and workstreams room`() = runTest {
+    fun `publishWorkstreamUpdate broadcasts workstream-updated with active=true to workstream room and workstreams room`() = runTest {
         val ws = Workstream("ws-1", "Title", "Desc", "alice", Priority.HIGH, WorkstreamStatus.PLANNING, now, now)
-        every { registry.activeRooms() } returns setOf("ws-1")
 
-        publisher.publishWorkstreamUpdate(ws)
+        publisher.publishWorkstreamUpdate(ws, active = true)
 
-        coVerify { registry.broadcast("ws-1", match { it.contains("workstream:updated") && it.contains("\"active\":true") }) }
-        coVerify { registry.broadcast("__workstreams__", match { it.contains("workstream:updated") }) }
+        coVerify { sessionRegistry.broadcast("ws-1", match { it.contains("workstream:updated") && it.contains("\"active\":true") }) }
+        coVerify { sessionRegistry.broadcast("__workstreams__", match { it.contains("workstream:updated") }) }
     }
 
     @Test
-    fun `publishWorkstreamUpdate sets active false when workstream has no active sessions`() = runTest {
-        val ws = Workstream("ws-1", "Title", "Desc", "alice", Priority.HIGH, WorkstreamStatus.NEW, now, now)
-        every { registry.activeRooms() } returns emptySet()
-
-        publisher.publishWorkstreamUpdate(ws)
-
-        coVerify { registry.broadcast("ws-1", match { it.contains("\"active\":false") }) }
-    }
-
-    @Test
-    fun `publishPresenceUpdate broadcasts workstream-updated with explicitly provided active value`() = runTest {
+    fun `publishWorkstreamUpdate broadcasts workstream-updated with active=false`() = runTest {
         val ws = Workstream("ws-1", "Title", "Desc", "alice", Priority.HIGH, WorkstreamStatus.NEW, now, now)
 
-        publisher.publishPresenceUpdate(ws, active = true)
+        publisher.publishWorkstreamUpdate(ws, active = false)
 
-        coVerify { registry.broadcast("ws-1", match { it.contains("\"active\":true") }) }
-        coVerify { registry.broadcast("__workstreams__", match { it.contains("\"active\":true") }) }
-    }
-
-    @Test
-    fun `publishPresenceUpdate does not call registry activeRooms`() = runTest {
-        val ws = Workstream("ws-1", "Title", "Desc", "alice", Priority.HIGH, WorkstreamStatus.NEW, now, now)
-
-        publisher.publishPresenceUpdate(ws, active = true)
-
-        verify(exactly = 0) { registry.activeRooms() }
+        coVerify { sessionRegistry.broadcast("ws-1", match { it.contains("\"active\":false") }) }
     }
 
     @Test
@@ -73,6 +52,6 @@ class WebSocketEventPublisherTest {
 
         publisher.publishPlanUpdate(plan)
 
-        coVerify { registry.broadcast("ws-1", match { it.contains("plan:updated") }) }
+        coVerify { sessionRegistry.broadcast("ws-1", match { it.contains("plan:updated") }) }
     }
 }

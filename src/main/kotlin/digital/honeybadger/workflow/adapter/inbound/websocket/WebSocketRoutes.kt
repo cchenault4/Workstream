@@ -1,14 +1,11 @@
 package digital.honeybadger.workflow.adapter.inbound.websocket
 
 import digital.honeybadger.workflow.appJson
-import digital.honeybadger.workflow.application.port.inbound.WorkstreamUseCase
-import digital.honeybadger.workflow.application.port.outbound.EventPublisher
+import digital.honeybadger.workflow.application.port.inbound.PresenceUseCase
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 
 /**
@@ -19,23 +16,21 @@ import org.slf4j.LoggerFactory
  *   {"type":"workstream:leave","workstreamId":"<id>"} — unsubscribe from a room
  *   {"type":"workstreams:subscribe"}                  — subscribe to all workstream updates
  *
- * On join and leave the publisher emits workstream:updated (including the current active
- * status) so presence is conveyed through the same event as data updates.
+ * Join and leave are delegated to [PresenceUseCase], which owns the subscriber
+ * count and broadcasts presence changes. On disconnect, [WebSocketSessionRegistry.leaveAll]
+ * returns the rooms this session occupied so the use case can decrement each count.
  */
 private const val WORKSTREAMS_ROOM = "__workstreams__"
 private val log = LoggerFactory.getLogger("WebSocketRoutes")
 
 fun Application.configureWebSocketRoutes(
-    registry: WebSocketSessionRegistry,
-    scope: CoroutineScope,
-    workstreamUseCase: WorkstreamUseCase,
-    publisher: EventPublisher,
+    sessionRegistry: WebSocketSessionRegistry,
+    presenceUseCase: PresenceUseCase,
 ) {
     routing {
         webSocket("/ws") {
             val sessionId = System.identityHashCode(this).toString(16)
             log.info("[{}] connected", sessionId)
-            val joinedRooms = mutableSetOf<String>()
             try {
                 for (frame in incoming) {
                     if (frame !is Frame.Text) continue
@@ -47,43 +42,29 @@ fun Application.configureWebSocketRoutes(
 
                     when (msg.type) {
                         "workstreams:subscribe" -> {
-                            registry.join(WORKSTREAMS_ROOM, this)
-                            joinedRooms.add(WORKSTREAMS_ROOM)
+                            sessionRegistry.join(WORKSTREAMS_ROOM, this)
                             log.info("[{}] joined workstreams room", sessionId)
                         }
                         "workstream:join" -> {
                             if (msg.workstreamId.isBlank()) continue
-                            registry.join(msg.workstreamId, this)
-                            joinedRooms.add(msg.workstreamId)
+                            sessionRegistry.join(msg.workstreamId, this)
+                            presenceUseCase.workstreamJoined(msg.workstreamId)
                             log.info("[{}] joined workstream={}", sessionId, msg.workstreamId)
-                            scope.launch { broadcastPresence(msg.workstreamId, active = true, workstreamUseCase, publisher) }
                         }
                         "workstream:leave" -> {
                             if (msg.workstreamId.isBlank()) continue
-                            registry.leave(msg.workstreamId, this)
-                            joinedRooms.remove(msg.workstreamId)
-                            val stillActive = registry.roomSize(msg.workstreamId) > 0
-                            log.info("[{}] left workstream={} stillActive={}", sessionId, msg.workstreamId, stillActive)
-                            scope.launch { broadcastPresence(msg.workstreamId, active = stillActive, workstreamUseCase, publisher) }
+                            sessionRegistry.leave(msg.workstreamId, this)
+                            presenceUseCase.workstreamLeft(msg.workstreamId)
+                            log.info("[{}] left workstream={}", sessionId, msg.workstreamId)
                         }
                     }
                 }
             } finally {
-                log.info("[{}] disconnected; cleaning up rooms={}", sessionId, joinedRooms)
-                joinedRooms.forEach { wid ->
-                    registry.leave(wid, this)
-                    if (wid != WORKSTREAMS_ROOM) {
-                        val stillActive = registry.roomSize(wid) > 0
-                        scope.launch { broadcastPresence(wid, active = stillActive, workstreamUseCase, publisher) }
-                    }
+                log.info("[{}] disconnected", sessionId)
+                sessionRegistry.leaveAll(this).forEach { wid ->
+                    if (wid != WORKSTREAMS_ROOM) presenceUseCase.workstreamLeft(wid)
                 }
             }
         }
     }
-}
-
-private fun broadcastPresence(workstreamId: String, active: Boolean, useCase: WorkstreamUseCase, publisher: EventPublisher) {
-    runCatching { useCase.getById(workstreamId) }
-        .onSuccess { publisher.publishPresenceUpdate(it, active) }
-        .onFailure { log.warn("workstream {} not found for presence broadcast", workstreamId) }
 }

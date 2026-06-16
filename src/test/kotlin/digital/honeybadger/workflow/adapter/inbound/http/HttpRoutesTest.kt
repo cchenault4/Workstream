@@ -1,6 +1,7 @@
 package digital.honeybadger.workflow.adapter.inbound.http
 
-import digital.honeybadger.workflow.adapter.inbound.websocket.DefaultWebSocketSessionRegistry
+import digital.honeybadger.workflow.adapter.outbound.persistence.InMemoryPresenceRegistry
+import digital.honeybadger.workflow.application.dto.WorkstreamSummary
 import digital.honeybadger.workflow.adapter.outbound.persistence.InMemoryActivityRepository
 import digital.honeybadger.workflow.adapter.outbound.persistence.InMemoryPlanRepository
 import digital.honeybadger.workflow.adapter.outbound.persistence.InMemoryWorkstreamRepository
@@ -24,7 +25,7 @@ import kotlin.test.assertNotNull
 /** No-op publisher so HTTP route tests focus on HTTP concerns, not broadcast behaviour. */
 private class NoOpEventPublisher : EventPublisher {
     override fun publish(event: ActivityEvent) {}
-    override fun publishWorkstreamUpdate(workstream: Workstream) {}
+    override fun publishWorkstreamUpdate(workstream: Workstream, active: Boolean) {}
     override fun publishPlanUpdate(plan: Plan) {}
 }
 
@@ -35,12 +36,13 @@ class HttpRoutesTest {
         val planRepo = InMemoryPlanRepository()
         val activityRepo = InMemoryActivityRepository()
         val publisher = NoOpEventPublisher()
-        val workstreamService = WorkstreamService(workstreamRepo, publisher)
+        val presenceRegistry = InMemoryPresenceRegistry()
+        val workstreamService = WorkstreamService(workstreamRepo, presenceRegistry, publisher)
         val planService = PlanService(workstreamRepo, planRepo, publisher, activityRepo)
         val activityService = ActivityService(workstreamRepo, activityRepo, publisher)
         application {
             configurePlugins()
-            configureHttpRoutes(workstreamService, planService, activityService, DefaultWebSocketSessionRegistry())
+            configureHttpRoutes(workstreamService, planService, activityService)
         }
     }
 

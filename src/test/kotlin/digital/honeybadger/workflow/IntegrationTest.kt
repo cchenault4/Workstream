@@ -1,6 +1,6 @@
 package digital.honeybadger.workflow
 
-import digital.honeybadger.workflow.adapter.inbound.http.WorkstreamSummary
+import digital.honeybadger.workflow.application.dto.WorkstreamSummary
 import digital.honeybadger.workflow.application.dto.*
 import digital.honeybadger.workflow.domain.model.*
 import io.ktor.client.call.*

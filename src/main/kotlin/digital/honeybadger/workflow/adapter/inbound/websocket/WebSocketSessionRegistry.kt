@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Purpose: provides the join/leave/broadcast primitives used by both the WebSocket
  *          route handler (inbound) and the [WebSocketEventPublisher] (outbound).
+ *          Presence state (active workstreams, subscriber counts) is owned by
+ *          [digital.honeybadger.workflow.application.port.outbound.PresenceRegistry].
  * Assumptions: sessions are identified by object identity; the same session joining
  *              a room twice results in a single registration (set semantics).
  * Invariants: a closed or dead session that throws on [send] is silently evicted so
@@ -17,10 +19,8 @@ import java.util.concurrent.ConcurrentHashMap
 interface WebSocketSessionRegistry {
     fun join(workstreamId: String, session: DefaultWebSocketSession)
     fun leave(workstreamId: String, session: DefaultWebSocketSession)
-    /** Number of sessions currently in [workstreamId]'s room. */
-    fun roomSize(workstreamId: String): Int
-    /** Workstream IDs (excluding internal rooms) that currently have at least one active session. */
-    fun activeRooms(): Set<String>
+    /** Removes [session] from all rooms it has joined and returns the affected room IDs. */
+    fun leaveAll(session: DefaultWebSocketSession): Set<String>
     suspend fun broadcast(workstreamId: String, message: String)
 }
 
@@ -44,13 +44,13 @@ class DefaultWebSocketSessionRegistry : WebSocketSessionRegistry {
         rooms[workstreamId]?.remove(session)
     }
 
-    override fun roomSize(workstreamId: String): Int = rooms[workstreamId]?.size ?: 0
-
-    override fun activeRooms(): Set<String> =
-        rooms.entries
-            .filter { it.value.isNotEmpty() && !it.key.startsWith("__") }
-            .map { it.key }
-            .toSet()
+    override fun leaveAll(session: DefaultWebSocketSession): Set<String> {
+        val affected = mutableSetOf<String>()
+        rooms.forEach { (wid, sessions) ->
+            if (sessions.remove(session)) affected.add(wid)
+        }
+        return affected
+    }
 
     override suspend fun broadcast(workstreamId: String, message: String) {
         val sessions = rooms[workstreamId]

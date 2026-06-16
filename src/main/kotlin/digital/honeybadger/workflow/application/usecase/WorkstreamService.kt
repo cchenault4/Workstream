@@ -2,9 +2,12 @@ package digital.honeybadger.workflow.application.usecase
 
 import digital.honeybadger.workflow.application.dto.CreateWorkstreamRequest
 import digital.honeybadger.workflow.application.dto.UpdateWorkstreamRequest
+import digital.honeybadger.workflow.application.dto.WorkstreamSummary
+import digital.honeybadger.workflow.application.dto.toSummary
 import digital.honeybadger.workflow.application.exception.WorkstreamNotFoundException
 import digital.honeybadger.workflow.application.port.inbound.WorkstreamUseCase
 import digital.honeybadger.workflow.application.port.outbound.EventPublisher
+import digital.honeybadger.workflow.application.port.outbound.PresenceRegistry
 import digital.honeybadger.workflow.application.port.outbound.WorkstreamRepository
 import digital.honeybadger.workflow.domain.model.Workstream
 import digital.honeybadger.workflow.domain.model.WorkstreamStatus
@@ -14,6 +17,7 @@ import java.util.UUID
 /** Concrete implementation of [WorkstreamUseCase]. Depends only on outbound ports and the clock. */
 class WorkstreamService(
     private val repository: WorkstreamRepository,
+    private val presenceRegistry: PresenceRegistry,
     private val publisher: EventPublisher,
     private val clock: Clock = Clock.System
 ) : WorkstreamUseCase {
@@ -36,11 +40,14 @@ class WorkstreamService(
                 updatedAt = now
             )
         )
-        publisher.publishWorkstreamUpdate(workstream)
+        publisher.publishWorkstreamUpdate(workstream, active = presenceRegistry.isActive(workstream.id))
         return workstream
     }
 
-    override fun list(): List<Workstream> = repository.findAll()
+    override fun list(): List<WorkstreamSummary> {
+        val active = presenceRegistry.activeWorkstreamIds()
+        return repository.findAll().map { it.toSummary(it.id in active) }
+    }
 
     override fun getById(id: String): Workstream =
         repository.findById(id) ?: throw WorkstreamNotFoundException(id)
@@ -56,7 +63,7 @@ class WorkstreamService(
                 updatedAt = clock.now()
             )
         )
-        publisher.publishWorkstreamUpdate(updated)
+        publisher.publishWorkstreamUpdate(updated, active = presenceRegistry.isActive(updated.id))
         return updated
     }
 }

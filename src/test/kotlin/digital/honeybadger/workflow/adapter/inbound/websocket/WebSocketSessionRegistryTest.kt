@@ -4,6 +4,8 @@ import io.ktor.websocket.*
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class WebSocketSessionRegistryTest {
 
@@ -69,37 +71,38 @@ class WebSocketSessionRegistryTest {
     }
 
     @Test
-    fun `roomSize reflects join and leave`() = runTest {
+    fun `leaveAll removes session from all joined rooms and returns their ids`() = runTest {
+        val session = mockSession()
+        registry.join("ws-1", session)
+        registry.join("ws-2", session)
+        registry.join("__workstreams__", session)
+
+        val rooms = registry.leaveAll(session)
+
+        assertEquals(setOf("ws-1", "ws-2", "__workstreams__"), rooms)
+        registry.broadcast("ws-1", "hello")
+        registry.broadcast("ws-2", "hello")
+        coVerify(exactly = 0) { session.send(any()) }
+    }
+
+    @Test
+    fun `leaveAll returns empty set when session was not in any room`() = runTest {
+        val session = mockSession()
+        assertTrue(registry.leaveAll(session).isEmpty())
+    }
+
+    @Test
+    fun `leaveAll only removes the target session leaving others intact`() = runTest {
         val s1 = mockSession()
         val s2 = mockSession()
         registry.join("ws-1", s1)
         registry.join("ws-1", s2)
-        assert(registry.roomSize("ws-1") == 2)
-        registry.leave("ws-1", s1)
-        assert(registry.roomSize("ws-1") == 1)
-        registry.leave("ws-1", s2)
-        assert(registry.roomSize("ws-1") == 0)
-    }
 
-    @Test
-    fun `roomSize returns 0 for unknown workstream`() = runTest {
-        assert(registry.roomSize("no-such-room") == 0)
-    }
+        registry.leaveAll(s1)
+        registry.broadcast("ws-1", "hello")
 
-    @Test
-    fun `activeRooms returns only non-internal rooms with at least one session`() = runTest {
-        val s1 = mockSession()
-        val s2 = mockSession()
-        val s3 = mockSession()
-        registry.join("ws-1", s1)
-        registry.join("ws-2", s2)
-        registry.join("__presence__", s3)
-        registry.leave("ws-2", s2)
-
-        val active = registry.activeRooms()
-        assert("ws-1" in active)
-        assert("ws-2" !in active)
-        assert("__presence__" !in active)  // internal room excluded
+        coVerify(exactly = 0) { s1.send(any()) }
+        coVerify(exactly = 1) { s2.send(any()) }
     }
 
     @Test

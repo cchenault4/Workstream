@@ -1,4 +1,4 @@
-package digital.honeybadger.workflow.adapter.inbound.http
+package digital.honeybadger.workflow.application.dto
 
 import digital.honeybadger.workflow.domain.model.Priority
 import digital.honeybadger.workflow.domain.model.Workstream

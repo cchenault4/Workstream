@@ -3,7 +3,9 @@ package digital.honeybadger.workflow.application.usecase
 import digital.honeybadger.workflow.application.dto.CreateWorkstreamRequest
 import digital.honeybadger.workflow.application.dto.UpdateWorkstreamRequest
 import digital.honeybadger.workflow.application.exception.WorkstreamNotFoundException
+import digital.honeybadger.workflow.application.dto.WorkstreamSummary
 import digital.honeybadger.workflow.application.port.outbound.EventPublisher
+import digital.honeybadger.workflow.application.port.outbound.PresenceRegistry
 import digital.honeybadger.workflow.application.port.outbound.WorkstreamRepository
 import digital.honeybadger.workflow.domain.model.*
 import io.mockk.*
@@ -14,9 +16,10 @@ import kotlin.test.*
 class WorkstreamServiceTest {
 
     private val repository = mockk<WorkstreamRepository>()
+    private val presenceRegistry = mockk<PresenceRegistry>(relaxed = true)
     private val publisher = mockk<EventPublisher>(relaxed = true)
     private val clock = mockk<Clock>()
-    private val service = WorkstreamService(repository, publisher, clock)
+    private val service = WorkstreamService(repository, presenceRegistry, publisher, clock)
 
     private val now = Instant.parse("2024-06-01T12:00:00Z")
     private val later = Instant.parse("2024-06-01T13:00:00Z")
@@ -45,13 +48,17 @@ class WorkstreamServiceTest {
         assertEquals(now, result.createdAt)
         assertEquals(now, result.updatedAt)
         verify(exactly = 1) { repository.save(any()) }
-        verify(exactly = 1) { publisher.publishWorkstreamUpdate(any()) }
+        verify(exactly = 1) { publisher.publishWorkstreamUpdate(any(), any()) }
     }
 
     @Test
-    fun `list delegates to repository`() {
+    fun `list returns summaries with active flag from presence registry`() {
         every { repository.findAll() } returns listOf(sample)
-        assertEquals(listOf(sample), service.list())
+        every { presenceRegistry.activeWorkstreamIds() } returns setOf("ws-1")
+        val result = service.list()
+        assertEquals(1, result.size)
+        assertEquals(sample.id, result[0].id)
+        assertTrue(result[0].active)
     }
 
     @Test
@@ -74,7 +81,7 @@ class WorkstreamServiceTest {
 
         service.update("ws-1", UpdateWorkstreamRequest(status = WorkstreamStatus.PLANNING))
 
-        verify(exactly = 1) { publisher.publishWorkstreamUpdate(any()) }
+        verify(exactly = 1) { publisher.publishWorkstreamUpdate(any(), any()) }
     }
 
     @Test

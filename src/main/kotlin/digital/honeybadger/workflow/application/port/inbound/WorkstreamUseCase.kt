@@ -2,6 +2,7 @@ package digital.honeybadger.workflow.application.port.inbound
 
 import digital.honeybadger.workflow.application.dto.CreateWorkstreamRequest
 import digital.honeybadger.workflow.application.dto.UpdateWorkstreamRequest
+import digital.honeybadger.workflow.application.dto.WorkstreamSummary
 import digital.honeybadger.workflow.application.exception.WorkstreamNotFoundException
 import digital.honeybadger.workflow.domain.model.Workstream
 
@@ -24,12 +25,13 @@ interface WorkstreamUseCase {
     fun create(request: CreateWorkstreamRequest): Workstream
 
     /**
-     * Returns all workstreams in the system, in insertion order.
+     * Returns all workstreams in the system as summaries, in insertion order.
      *
-     * Purpose: supports list views and polling clients.
+     * Purpose: supports list views; each summary includes the current real-time presence
+     *          state so callers do not need to query presence separately.
      * Invariants: never returns null; returns an empty list when no workstreams exist.
      */
-    fun list(): List<Workstream>
+    fun list(): List<WorkstreamSummary>
 
     /**
      * Returns the workstream with the given [id].
