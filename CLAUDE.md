@@ -99,7 +99,7 @@ Run from `frontend/`:
 
 ```bash
 npm run dev          # Vite dev server on http://localhost:5173
-npm test             # run all 64 tests (single pass)
+npm test             # run all 63 tests (single pass)
 npm run test:watch   # run tests in watch mode
 ```
 
@@ -179,6 +179,6 @@ Applied in `addActivity()`, `submit()` (WorkstreamsView), and the WS `onActivity
 | Language | Kotlin 2.2.0 | TypeScript |
 | Framework | Ktor 3.1.3 (Netty) | Vue 3.5 + Vite 8 |
 | Build | Gradle 9.x (Kotlin DSL) | npm |
-| Testing | MockK + testApplication (85 tests) | Vitest + @vue/test-utils (64 tests) |
+| Testing | MockK + testApplication (85 tests) | Vitest + @vue/test-utils (63 tests) |
 | Storage | In-memory (no DB) | — |
 | Real-time | Ktor WebSockets | Native WebSocket API |

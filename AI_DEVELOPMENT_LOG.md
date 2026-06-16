@@ -338,7 +338,7 @@ This prevented premature abstraction of the more complex structures.
 
 Claude Code proposed the stack (Vitest + @vue/test-utils + happy-dom, with `vi.mock` for the API
 layer rather than MSW), explained the tradeoff, and implemented the full suite after human
-approval. 64 tests across 8 files:
+approval. 63 tests across 8 files:
 
 | Layer | Files | Tests | What is covered |
 |-------|-------|-------|-----------------|
@@ -360,8 +360,8 @@ verifying that only one item appears regardless of which arrives first.
 | Layer | Tests | Runner |
 |-------|-------|--------|
 | Backend (Kotlin) | 81 | `gradle test` |
-| Frontend (TypeScript/Vue) | 64 | `npm test` |
-| **Total** | **145** | |
+| Frontend (TypeScript/Vue) | 63 | `npm test` |
+| **Total** | **144** | |
 
 ---
 
@@ -466,5 +466,5 @@ The final state:
 | Layer | Tests | Runner |
 |-------|-------|--------|
 | Backend (Kotlin) | 85 | `gradle test` |
-| Frontend (TypeScript/Vue) | 64 | `npm test` |
-| **Total** | **149** | |
+| Frontend (TypeScript/Vue) | 63 | `npm test` |
+| **Total** | **148** | |
