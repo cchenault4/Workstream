@@ -151,7 +151,8 @@ frontend/src/
   views/
     WorkstreamsView.vue    — list + create form; uses useWorkstreamsSocket
     WorkstreamDetailView.vue — header + 3 tabs (plan / readiness / activity)
-  types/workstream.ts     — all shared TypeScript interfaces
+  types/workstream.ts     — all shared TypeScript interfaces; Workstream (no active field),
+                            WorkstreamSummary extends Workstream (adds active: boolean)
   utils/badges.ts         — PRIORITY_CLASS, STATUS_CLASS, etc. badge variant maps
   utils/format.ts         — formatDate, formatDateTime
   __tests__/              — Vitest suite (mocks/websocket.ts, utils, components, composables, views)
@@ -160,8 +161,8 @@ frontend/src/
 **WebSocket composables:**
 - `useWorkstreamSocket(id, handlers)` — joins/leaves a single workstream room; calls
   `onActivity`, `onWorkstreamUpdated`, `onPlanUpdated` handlers; sends `workstream:leave` on unmount
-- `useWorkstreamsSocket(handlers?)` — sends `workstreams:subscribe`; updates `activeWorkstreamIds`
-  ref on `workstream:updated` messages with `active` field; calls `onWorkstreamUpdated` handler
+- `useWorkstreamsSocket(handlers?)` — sends `workstreams:subscribe`; calls `onWorkstreamUpdated`
+  with a `WorkstreamSummary` (includes `active: boolean`) on every `workstream:updated` message
 
 **Dedup pattern:** Both activity creation and workstream creation have a race condition where the
 WebSocket broadcast arrives before the POST response. The guard is:
@@ -171,6 +172,11 @@ if (!list.value.some(item => item.id === incoming.id)) {
 }
 ```
 Applied in `addActivity()`, `submit()` (WorkstreamsView), and the WS `onActivity` handler.
+
+**`WorkstreamSummary` in the create flow:** `createWorkstream` returns a plain `Workstream` (no
+`active` field). Before prepending it to the `WorkstreamSummary[]` list, `WorkstreamsView` converts
+it: `const summary: WorkstreamSummary = { ...created, active: false }`. A newly created workstream
+has no viewers, so `active: false` is always correct at creation time.
 
 ## Tech Stack Summary
 
