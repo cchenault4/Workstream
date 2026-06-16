@@ -468,3 +468,29 @@ The final state:
 | Backend (Kotlin) | 85 | `gradle test` |
 | Frontend (TypeScript/Vue) | 63 | `npm test` |
 | **Total** | **148** | |
+
+---
+
+## Phase 4: Frontend Type Alignment
+
+After the backend `WorkstreamSummary` refactoring, the frontend still used a single `Workstream`
+type with `active?: boolean` for both the list and detail endpoints — meaning the required `active`
+field from `GET /workstreams` was modelled as optional, and `GET /workstreams/:id` (which returns
+no active field) shared the same type.
+
+> *"Update the frontend tests to reflect the new WorkstreamSummary location."*
+
+Claude Code identified that all five affected files needed to change together:
+
+- **`types/workstream.ts`** — `Workstream` loses `active`; a new `WorkstreamSummary extends
+  Workstream` interface adds `active: boolean` (required, not optional)
+- **`api/workstreams.ts`** — `listWorkstreams()` return type updated to `WorkstreamSummary[]`
+- **`useWorkstreamSocket.ts`** — `WorkstreamsHandlers.onWorkstreamUpdated` receives
+  `WorkstreamSummary` (the WS `workstream:updated` broadcast from the list subscription includes
+  the active flag)
+- **`WorkstreamsView.vue`** — stores `WorkstreamSummary[]`; `createWorkstream` returns a plain
+  `Workstream`, so the view converts it with `active: false` before prepending to the list
+- **`WorkstreamsView.test.ts`** — list fixtures typed as `WorkstreamSummary`; the POST mock
+  correctly returns a plain `Workstream`; the WS broadcast fixture is a `WorkstreamSummary`
+
+All 63 frontend tests continued to pass after the changes.
