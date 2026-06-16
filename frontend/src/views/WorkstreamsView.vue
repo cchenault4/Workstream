@@ -5,9 +5,9 @@ import { useWorkstreamsSocket } from '../composables/useWorkstreamSocket'
 import { PRIORITY_CLASS, STATUS_CLASS } from '../utils/badges'
 import { formatDate } from '../utils/format'
 import Badge from '../components/Badge.vue'
-import type { CreateWorkstreamRequest, Workstream } from '../types/workstream'
+import type { CreateWorkstreamRequest, WorkstreamSummary } from '../types/workstream'
 
-const workstreams = ref<Workstream[]>([])
+const workstreams = ref<WorkstreamSummary[]>([])
 const loading = ref(true)
 const loadError = ref<string | null>(null)
 useWorkstreamsSocket({
@@ -48,8 +48,9 @@ async function submit() {
   submitError.value = null
   try {
     const created = await workstreamsApi.createWorkstream(form.value)
-    if (!workstreams.value.some(ws => ws.id === created.id)) {
-      workstreams.value.unshift(created)
+    const summary: WorkstreamSummary = { ...created, active: false }
+    if (!workstreams.value.some(ws => ws.id === summary.id)) {
+      workstreams.value.unshift(summary)
     }
     showForm.value = false
     form.value = { title: '', description: '', requester: '', priority: 'MEDIUM' }

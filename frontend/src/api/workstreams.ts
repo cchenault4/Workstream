@@ -7,6 +7,7 @@ import type {
   UpdateWorkstreamRequest,
   UpsertPlanRequest,
   Workstream,
+  WorkstreamSummary,
 } from '../types/workstream'
 
 const BASE = '/api'
@@ -25,7 +26,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const workstreamsApi = {
   listWorkstreams: () =>
-    request<Workstream[]>('/workstreams'),
+    request<WorkstreamSummary[]>('/workstreams'),
 
   createWorkstream: (payload: CreateWorkstreamRequest) =>
     request<Workstream>('/workstreams', { method: 'POST', body: JSON.stringify(payload) }),

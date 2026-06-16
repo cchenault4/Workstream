@@ -1,6 +1,6 @@
 import { onUnmounted } from 'vue'
 import { sendWhenReady, addHandler } from './socket'
-import type { ActivityEvent, Plan, Workstream } from '../types/workstream'
+import type { ActivityEvent, Plan, Workstream, WorkstreamSummary } from '../types/workstream'
 
 interface Handlers {
   onActivity?: (event: ActivityEvent) => void
@@ -9,7 +9,7 @@ interface Handlers {
 }
 
 interface WorkstreamsHandlers {
-  onWorkstreamUpdated?: (workstream: Workstream) => void
+  onWorkstreamUpdated?: (workstream: WorkstreamSummary) => void
 }
 
 /**
@@ -48,7 +48,7 @@ export function useWorkstreamSocket(workstreamId: string, handlers: Handlers): v
 export function useWorkstreamsSocket(handlers?: WorkstreamsHandlers): void {
   const remove = addHandler((msg) => {
     if (msg.type === 'workstream:updated' && msg.data !== null && typeof msg.data === 'object') {
-      handlers?.onWorkstreamUpdated?.(msg.data as Workstream)
+      handlers?.onWorkstreamUpdated?.(msg.data as WorkstreamSummary)
     }
   })
 

@@ -27,9 +27,13 @@ export interface Workstream {
   requester: string
   priority: Priority
   status: WorkstreamStatus
-  active?: boolean
   createdAt: string
   updatedAt: string
+}
+
+/** List-endpoint projection — identical to Workstream but with a guaranteed active flag. */
+export interface WorkstreamSummary extends Workstream {
+  active: boolean
 }
 
 export interface Phase {

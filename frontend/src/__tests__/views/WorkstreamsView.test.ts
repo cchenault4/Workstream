@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import WorkstreamsView from '../../views/WorkstreamsView.vue'
-import type { Workstream } from '../../types/workstream'
+import type { Workstream, WorkstreamSummary } from '../../types/workstream'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -13,10 +13,10 @@ vi.mock('vue-router', () => ({
 }))
 
 // Capture the onWorkstreamUpdated handler so tests can simulate WS messages.
-let capturedOnWorkstreamUpdated: ((ws: Workstream) => void) | undefined
+let capturedOnWorkstreamUpdated: ((ws: WorkstreamSummary) => void) | undefined
 
 vi.mock('../../composables/useWorkstreamSocket', () => ({
-  useWorkstreamsSocket: vi.fn((handlers?: { onWorkstreamUpdated?: (ws: Workstream) => void }) => {
+  useWorkstreamsSocket: vi.fn((handlers?: { onWorkstreamUpdated?: (ws: WorkstreamSummary) => void }) => {
     capturedOnWorkstreamUpdated = handlers?.onWorkstreamUpdated
   }),
   useWorkstreamSocket: vi.fn(),
@@ -33,13 +33,13 @@ vi.mock('../../api/workstreams', () => ({
 
 import { workstreamsApi } from '../../api/workstreams'
 
-const ws1: Workstream = {
+const ws1: WorkstreamSummary = {
   id: 'ws-1', title: 'Auth service', description: 'Add JWT', requester: 'alice',
   priority: 'HIGH', status: 'NEW', active: false,
   createdAt: '2025-03-01T10:00:00Z', updatedAt: '2025-03-01T10:00:00Z',
 }
 
-const ws2: Workstream = {
+const ws2: WorkstreamSummary = {
   id: 'ws-2', title: 'Search feature', description: 'Full-text search', requester: 'bob',
   priority: 'MEDIUM', status: 'PLANNING', active: true,
   createdAt: '2025-03-02T10:00:00Z', updatedAt: '2025-03-02T10:00:00Z',
@@ -53,11 +53,15 @@ function mountView() {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+const createdWs: Workstream = {
+  id: 'ws-new', title: 'New WS', description: 'Add JWT', requester: 'alice',
+  priority: 'HIGH', status: 'NEW',
+  createdAt: '2025-03-01T10:00:00Z', updatedAt: '2025-03-01T10:00:00Z',
+}
+
 beforeEach(() => {
   vi.mocked(workstreamsApi.listWorkstreams).mockResolvedValue([ws1, ws2])
-  vi.mocked(workstreamsApi.createWorkstream).mockResolvedValue({
-    ...ws1, id: 'ws-new', title: 'New WS',
-  })
+  vi.mocked(workstreamsApi.createWorkstream).mockResolvedValue(createdWs)
   capturedOnWorkstreamUpdated = undefined
   mockPush.mockClear()
 })
@@ -121,7 +125,7 @@ describe('WorkstreamsView', () => {
 
   it('deduplicates when WS message adds workstream before POST resolves', async () => {
     let resolveCreate!: (ws: Workstream) => void
-    const newWs: Workstream = { ...ws1, id: 'ws-new', title: 'New WS' }
+    const wsFromBroadcast: WorkstreamSummary = { ...createdWs, active: false }
     vi.mocked(workstreamsApi.createWorkstream).mockReturnValue(
       new Promise(resolve => { resolveCreate = resolve }),
     )
@@ -137,11 +141,11 @@ describe('WorkstreamsView', () => {
     await wrapper.find('form').trigger('submit')
 
     // WS broadcast arrives first
-    capturedOnWorkstreamUpdated?.(newWs)
+    capturedOnWorkstreamUpdated?.(wsFromBroadcast)
     await flushPromises()
 
     // Then POST resolves
-    resolveCreate(newWs)
+    resolveCreate(createdWs)
     await flushPromises()
 
     // Should appear only once in the table
@@ -154,7 +158,7 @@ describe('WorkstreamsView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    capturedOnWorkstreamUpdated?.({ ...ws1, title: 'Updated Title' })
+    capturedOnWorkstreamUpdated?.({ ...ws1, title: 'Updated Title', active: false })
     await flushPromises()
 
     expect(wrapper.text()).toContain('Updated Title')
