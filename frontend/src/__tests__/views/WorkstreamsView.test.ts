@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { ref } from 'vue'
 import WorkstreamsView from '../../views/WorkstreamsView.vue'
 import type { Workstream } from '../../types/workstream'
 
@@ -13,15 +12,12 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ params: {} }),
 }))
 
-// Capture the onWorkstreamUpdated handler registered by the component so tests
-// can simulate incoming WebSocket messages without a real WebSocket.
+// Capture the onWorkstreamUpdated handler so tests can simulate WS messages.
 let capturedOnWorkstreamUpdated: ((ws: Workstream) => void) | undefined
-const activeWorkstreamIds = ref<string[]>([])
 
 vi.mock('../../composables/useWorkstreamSocket', () => ({
   useWorkstreamsSocket: vi.fn((handlers?: { onWorkstreamUpdated?: (ws: Workstream) => void }) => {
     capturedOnWorkstreamUpdated = handlers?.onWorkstreamUpdated
-    return { activeWorkstreamIds }
   }),
   useWorkstreamSocket: vi.fn(),
 }))
@@ -62,7 +58,6 @@ beforeEach(() => {
   vi.mocked(workstreamsApi.createWorkstream).mockResolvedValue({
     ...ws1, id: 'ws-new', title: 'New WS',
   })
-  activeWorkstreamIds.value = []
   capturedOnWorkstreamUpdated = undefined
   mockPush.mockClear()
 })
@@ -81,14 +76,11 @@ describe('WorkstreamsView', () => {
     expect(wrapper.text()).toContain('Search feature')
   })
 
-  it('shows Active badge only for active workstreams', async () => {
+  it('shows Active badge only for workstreams with active:true', async () => {
+    // ws2 has active:true, ws1 has active:false
     const wrapper = mountView()
-    // Mark ws-2 as active via the reactive ref
-    activeWorkstreamIds.value = ['ws-2']
     await flushPromises()
-    const text = wrapper.text()
-    // Active badge should appear exactly once
-    const activeCount = (text.match(/● Active/g) ?? []).length
+    const activeCount = (wrapper.text().match(/● Active/g) ?? []).length
     expect(activeCount).toBe(1)
   })
 

@@ -10,13 +10,13 @@ import type { CreateWorkstreamRequest, Workstream } from '../types/workstream'
 const workstreams = ref<Workstream[]>([])
 const loading = ref(true)
 const loadError = ref<string | null>(null)
-const { activeWorkstreamIds } = useWorkstreamsSocket({
+useWorkstreamsSocket({
   onWorkstreamUpdated: (updated) => {
     const i = workstreams.value.findIndex(ws => ws.id === updated.id)
     if (i >= 0) {
-      workstreams.value[i] = { ...updated, active: activeWorkstreamIds.value.includes(updated.id) }
+      workstreams.value[i] = updated
     } else {
-      workstreams.value.unshift({ ...updated, active: false })
+      workstreams.value.unshift(updated)
     }
   },
 })
@@ -36,7 +36,6 @@ async function load() {
   loadError.value = null
   try {
     workstreams.value = await workstreamsApi.listWorkstreams()
-    activeWorkstreamIds.value = workstreams.value.filter(ws => ws.active).map(ws => ws.id)
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : 'Failed to load'
   } finally {
@@ -142,7 +141,7 @@ onMounted(load)
         <tr v-for="ws in workstreams" :key="ws.id" class="clickable" @click="$router.push(`/workstreams/${ws.id}`)">
           <td class="cell-title">{{ ws.title }}</td>
           <td class="cell-presence">
-            <Badge v-if="activeWorkstreamIds.includes(ws.id)" variant="badge-active" label="● Active" />
+            <Badge v-if="ws.active" variant="badge-active" label="● Active" />
           </td>
           <td>{{ ws.requester }}</td>
           <td><Badge :variant="PRIORITY_CLASS[ws.priority]" :label="ws.priority" /></td>

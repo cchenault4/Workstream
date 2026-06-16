@@ -1,3 +1,9 @@
+<script setup lang="ts">
+import { onUnmounted } from 'vue'
+import { teardownSocket } from './composables/socket'
+onUnmounted(teardownSocket)
+</script>
+
 <template>
   <header>
     <span class="app-name">Workstream</span>

@@ -10,44 +10,42 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 
-/**
- * Outbound adapter implementing [EventPublisher] via [WebSocketSessionRegistry].
- *
- * Purpose: bridges the synchronous use-case layer to the async WebSocket transport.
- *          Each publish call launches a fire-and-forget coroutine in [scope] so
- *          the calling thread is never blocked by I/O.
- * Assumptions: broadcast failures (closed sessions) are swallowed inside the registry;
- *              this class does not observe or retry them.
- * Invariants: the publish methods return immediately; delivery is best-effort and async.
- *             Broadcast coroutines are children of [scope], so they are cancelled when
- *             the scope (i.e. the application) shuts down.
- */
+private const val WORKSTREAMS_ROOM = "__workstreams__"
+
 class WebSocketEventPublisher(
     private val registry: WebSocketSessionRegistry,
     private val scope: CoroutineScope,
-    private val json: Json = appJson
+    private val json: Json = appJson,
 ) : EventPublisher {
 
-    override fun publish(event: ActivityEvent) =
-        broadcast(event.workstreamId, "activity:created", json.encodeToJsonElement(event))
+    override fun publish(event: ActivityEvent) {
+        val message = json.encodeToString(WsServerMessage("activity:created", json.encodeToJsonElement(event)))
+        scope.launch { registry.broadcast(event.workstreamId, message) }
+    }
 
     override fun publishWorkstreamUpdate(workstream: Workstream) {
-        val data = json.encodeToJsonElement(workstream)
-        // Notify clients in the workstream's own room (detail page) and the list-page room.
-        val message = json.encodeToString(WsServerMessage("workstream:updated", data))
+        // Include the live active status so the list page can update the Active badge
+        // from the same workstream:updated event rather than a separate presence message.
+        val active = workstream.id in registry.activeRooms()
+        val wsJson = json.encodeToJsonElement(workstream).jsonObject
+        val payload = buildJsonObject {
+            wsJson.entries.forEach { entry -> put(entry.key, entry.value) }
+            put("active", active)
+        }
+        val message = json.encodeToString(WsServerMessage("workstream:updated", payload))
         scope.launch {
             registry.broadcast(workstream.id, message)
-            registry.broadcast("__workstreams__", message)
+            registry.broadcast(WORKSTREAMS_ROOM, message)
         }
     }
 
-    override fun publishPlanUpdate(plan: Plan) =
-        broadcast(plan.workstreamId, "plan:updated", json.encodeToJsonElement(plan))
-
-    private fun broadcast(workstreamId: String, type: String, data: kotlinx.serialization.json.JsonElement) {
-        val message = json.encodeToString(WsServerMessage(type, data))
-        scope.launch { registry.broadcast(workstreamId, message) }
+    override fun publishPlanUpdate(plan: Plan) {
+        val message = json.encodeToString(WsServerMessage("plan:updated", json.encodeToJsonElement(plan)))
+        scope.launch { registry.broadcast(plan.workstreamId, message) }
     }
 }

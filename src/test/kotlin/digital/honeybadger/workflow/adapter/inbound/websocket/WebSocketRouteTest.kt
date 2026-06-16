@@ -1,56 +1,67 @@
 package digital.honeybadger.workflow.adapter.inbound.websocket
 
+import digital.honeybadger.workflow.application.port.inbound.WorkstreamUseCase
+import digital.honeybadger.workflow.application.port.outbound.EventPublisher
+import digital.honeybadger.workflow.configurePlugins
+import digital.honeybadger.workflow.domain.model.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.server.testing.*
 import io.ktor.websocket.*
-import digital.honeybadger.workflow.configurePlugins
+import io.mockk.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.datetime.Instant
 import kotlin.test.Test
-import kotlin.test.assertEquals
 
 class WebSocketRouteTest {
 
+    private val now = Instant.parse("2024-06-01T12:00:00Z")
+    private val testWorkstream = Workstream("ws-1", "Title", "Desc", "alice", Priority.HIGH, WorkstreamStatus.NEW, now, now)
+
+    private fun mockDeps(): Pair<WorkstreamUseCase, EventPublisher> {
+        val useCase = mockk<WorkstreamUseCase>()
+        val publisher = mockk<EventPublisher>(relaxed = true)
+        every { useCase.getById(any()) } returns testWorkstream
+        return useCase to publisher
+    }
+
     @Test
     fun `websocket endpoint accepts connections`() = testApplication {
+        val (useCase, publisher) = mockDeps()
         val registry = DefaultWebSocketSessionRegistry()
         application {
             configurePlugins()
-            configureWebSocketRoutes(registry, CoroutineScope(Dispatchers.Default))
+            configureWebSocketRoutes(registry, CoroutineScope(Dispatchers.Default), useCase, publisher)
         }
-        val client = createClient { install(WebSockets) }
-        client.webSocket("/ws") {
+        createClient { install(WebSockets) }.webSocket("/ws") {
             // connection established without error
         }
     }
 
     @Test
     fun `join and leave messages are processed without error`() = testApplication {
+        val (useCase, publisher) = mockDeps()
         val registry = DefaultWebSocketSessionRegistry()
         application {
             configurePlugins()
-            configureWebSocketRoutes(registry, CoroutineScope(Dispatchers.Default))
+            configureWebSocketRoutes(registry, CoroutineScope(Dispatchers.Default), useCase, publisher)
         }
-        val client = createClient { install(WebSockets) }
-        client.webSocket("/ws") {
+        createClient { install(WebSockets) }.webSocket("/ws") {
             send(Frame.Text("""{"type":"workstream:join","workstreamId":"ws-1"}"""))
             send(Frame.Text("""{"type":"workstream:leave","workstreamId":"ws-1"}"""))
-            // no exception = success
         }
     }
 
     @Test
     fun `unknown message type is silently ignored`() = testApplication {
+        val (useCase, publisher) = mockDeps()
         val registry = DefaultWebSocketSessionRegistry()
         application {
             configurePlugins()
-            configureWebSocketRoutes(registry, CoroutineScope(Dispatchers.Default))
+            configureWebSocketRoutes(registry, CoroutineScope(Dispatchers.Default), useCase, publisher)
         }
-        val client = createClient { install(WebSockets) }
-        client.webSocket("/ws") {
+        createClient { install(WebSockets) }.webSocket("/ws") {
             send(Frame.Text("""{"type":"unknown:event","workstreamId":"ws-1"}"""))
-            // no exception — connection remains open
         }
     }
 }

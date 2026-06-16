@@ -13,8 +13,6 @@ import kotlin.test.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class WebSocketEventPublisherTest {
 
-    // relaxed = true avoids MockK bypassing the constructor on a concrete class,
-    // which would leave internal fields null and crash on coEvery setup.
     private val registry = mockk<WebSocketSessionRegistry>(relaxed = true)
     private val publisher = WebSocketEventPublisher(registry, CoroutineScope(Dispatchers.Unconfined))
 
@@ -30,12 +28,24 @@ class WebSocketEventPublisherTest {
     }
 
     @Test
-    fun `publishWorkstreamUpdate broadcasts workstream-updated to the workstream's room`() = runTest {
+    fun `publishWorkstreamUpdate broadcasts workstream-updated to workstream room and workstreams room`() = runTest {
         val ws = Workstream("ws-1", "Title", "Desc", "alice", Priority.HIGH, WorkstreamStatus.PLANNING, now, now)
+        every { registry.activeRooms() } returns setOf("ws-1")
 
         publisher.publishWorkstreamUpdate(ws)
 
-        coVerify { registry.broadcast("ws-1", match { it.contains("workstream:updated") }) }
+        coVerify { registry.broadcast("ws-1", match { it.contains("workstream:updated") && it.contains("\"active\":true") }) }
+        coVerify { registry.broadcast("__workstreams__", match { it.contains("workstream:updated") }) }
+    }
+
+    @Test
+    fun `publishWorkstreamUpdate sets active false when workstream has no active sessions`() = runTest {
+        val ws = Workstream("ws-1", "Title", "Desc", "alice", Priority.HIGH, WorkstreamStatus.NEW, now, now)
+        every { registry.activeRooms() } returns emptySet()
+
+        publisher.publishWorkstreamUpdate(ws)
+
+        coVerify { registry.broadcast("ws-1", match { it.contains("\"active\":false") }) }
     }
 
     @Test
